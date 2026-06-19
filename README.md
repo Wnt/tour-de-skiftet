@@ -5,15 +5,24 @@
 
 Interaktiivinen, mobiilikäyttöön ja offline-tilaan suunniteltu reittiopas saariston
 rengastien pohjoiselle lenkille **Kustavi → Brändö → Houtskär → Iniö → Kustavi**
-(vastapäivään). Yhdellä sivulla:
+(suunta ja päivät valittavissa Vaihtoehdot-välilehdeltä). Yhdellä sivulla:
 
 - 🗺️ **Kartta** — koko reitti, etäisyydet jokaisella välillä, lautta- ja pyöräosuudet,
   majoitukset ja "paikanna minut".
-- 🚲 **Reitti** — vaiheittainen etappilista ja päiväohjelma (2 yötä), ml. **sähköpyörän ajoajat** (20 km/h).
-- ⛴️ **Lautat** — lauttojen aikataulut, seuraava lähtö, varaustiedot ja linkit.
-- 🌤️ **Sää** — sääennuste **Ilmatieteen laitoksen** avoimesta datasta (FMI WFS) jokaiseen pisteeseen, tuuli korostettuna.
+- ⚖️ **Vaihtoehdot** (aloitusnäkymä) — kaikki 2 päivän lenkkivaihtoehdot molempiin suuntiin, järjestettynä tuoreen FMI-sään mukaan. Valitse yksi → muut näkymät päivittyvät sen mukaan.
+- 🚲 **Reitti** — valitun vaihtoehdon **päiväohjelma ensin**, sitten vaiheittainen etappilista; **sähköpyörän ajoajat** (20 km/h) ja jokaisella lauttavälillä **kaikki päivän vuorot** (viimeisin ehtivä korostettuna) + linkki aikatauluun.
+- ⛴️ **Lautat** — lauttojen aikataulut, seuraava lähtö, varaustiedot ja linkit; valitun päivän yhteydet korostettuna.
+- 🌤️ **Sää** — sääennuste **Ilmatieteen laitoksen** avoimesta datasta (FMI WFS) jokaiseen pisteeseen, tuuli korostettuna; valitut matkapäivät korostettuna.
 - 🌧️ **Sadetutka** — Kartta-välilehden 🌧️-painike näyttää FMI:n tutka-animaation (edellinen tunti) reitin päällä.
 - ℹ️ **Info** — majoitukset, hyvä-tietää-vinkit ja lähteet.
+
+## Käyttäjätarinat (toteutetut)
+
+1. **Tiivis päiväohjelma.** Käyttäjänä haluan päiväohjelman askelten olevan tiiviitä (`🚲 Osnäs → Kivimaa · 9,5 km · ~29 min`) ilman sulkeissa olevaa täytettä, jotta luen ne yhdellä silmäyksellä.
+2. **Kaikki lauttavuorot + viimeisin ehtivä.** Käyttäjänä haluan nähdä jokaisen yhteysaluksen kaikki päivän lähdöt, joista viimeisin matkavauhtiin sopiva on korostettu, jotta tiedän pelivarani.
+3. **Vahvista käytetty vuoro reaaliajassa.** Reissun aikana haluan napauttaa "otin tämän vuoron" ja että loppusuunnitelma laskee uudelleen ja näyttää vain relevantit jatkoyhteydet.
+4. **Linkki aikatauluun.** Haluan jokaisesta yhteysaluksesta "Aikataulu →" -linkin, joka vie suoraan k.o. päivän k.o. aluksen aikatauluun sovelluksen sisällä.
+5. **Vaihtoehtojen vertailu.** Haluan valita matkapäivät säävertailun perusteella, jolloin Reitti, Sää ja Lautat heijastavat valintaa.
 
 Sovellus on **PWA**: sen voi asentaa puhelimen kotinäytölle ja se toimii **offline-tilassa**
 (reitti, etäisyydet ja aikataulut aina; kartta niiltä alueilta jotka on kerran ladattu

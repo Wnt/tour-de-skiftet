@@ -120,127 +120,503 @@
     return legs;
   }
 
-  /* ---------- Generate day plan ---------- */
+  /* ---------- displayName: strip " (...)" parenthetical suffixes ---------- */
+  function displayName(key) {
+    var p = place(key);
+    var n = p.name || key;
+    return n.replace(/\s*\([^)]*\)\s*$/, '').trim();
+  }
+
+  /* ---------- fmtKm: format km with Finnish decimal comma ---------- */
+  function fmtKm(km) {
+    if (km == null) return '—';
+    var s = (+km).toFixed(km === Math.floor(km) ? 0 : 1);
+    return s.replace('.', ',');
+  }
+
+  /* ---------- tripProgress: persisted { dateKey: { ferryId: 'HH:MM' } } ---------- */
+  var PROGRESS_KEY = 'skiftet_progress_v1';
+
+  function loadProgress() {
+    try { return JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}'); } catch (e) { return {}; }
+  }
+
+  function saveProgress(prog) {
+    try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(prog)); } catch (e) {}
+  }
+
+  /* ---------- chooseDeparture / clearDeparture ---------- */
+  function chooseDeparture(dateKey, ferryId, time) {
+    var prog = loadProgress();
+    if (!prog[dateKey]) prog[dateKey] = {};
+    prog[dateKey][ferryId] = time;
+    saveProgress(prog);
+    renderDayPlan();
+  }
+
+  function clearDeparture(dateKey, ferryId) {
+    var prog = loadProgress();
+    if (prog[dateKey]) delete prog[dateKey][ferryId];
+    saveProgress(prog);
+    renderDayPlan();
+  }
+
+  /* ---------- openFerrySchedule ---------- */
+  function openFerrySchedule(ferryId, dateKey) {
+    showView('ferries');
+    setFerryFilterToDate(dateKey);
+    buildFerries();
+    setTimeout(function () {
+      var node = document.getElementById('ferry-' + ferryId);
+      if (!node) return;
+      node.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      node.classList.add('ferry-card--flash');
+      setTimeout(function () { node.classList.remove('ferry-card--flash'); }, 1200);
+    }, 120);
+  }
+
+  /* ---------- generateDayPlan (structured object version) ---------- */
   function generateDayPlan(dir, d1key, d2key) {
-    var legs = T.legs; // already set by generateLegs call before this
+    var allLegs = T.legs || [];
     var d1 = isoToDate(d1key);
     var d2 = isoToDate(d2key);
 
-    function schedulerForDay(dayNum, date) {
-      var dayLegs = legs.filter(function (l) { return l.day === dayNum; });
-      var currentMin = 9 * 60; // 09:00
-      var rows = [];
+    /* Build structured steps for one day */
+    function buildDaySteps(dayNum, date) {
+      var dayLegs = allLegs.filter(function (l) { return l.day === dayNum; });
+      var steps = [];
 
       dayLegs.forEach(function (leg) {
-        var a = place(leg.from), b = place(leg.to);
-        var fromName = a.name || leg.from;
-        var toName = b.name || leg.to;
-
         if (leg.mode === 'bike') {
-          var depart = currentMin;
-          var ride = rideMin(leg.km || 0);
-          var arrive = depart + ride;
-          var txt = '🚲 ' + fromName + ' → ' + toName + ' ~' + (leg.km || 0) + ' km (~' + fmtDur(ride) + ')';
-          rows.push({ t: hhmm(depart), text: txt });
-          currentMin = arrive;
-          // 15-min break if ride >= 40 km
-          if ((leg.km || 0) >= 40) currentMin += 15;
+          steps.push({
+            type: 'bike',
+            from: leg.from,
+            to: leg.to,
+            km: leg.km || 0,
+            departMin: null,   // filled by forward pass below
+            arriveMin: null
+          });
 
         } else if (leg.mode === 'ferry') {
           var ferryId = leg.ferry;
           var fobj = (T.ferries || {})[ferryId];
-          var ferryName = fobj ? fobj.name : ferryId;
+          var vessel = fobj ? fobj.name : ferryId;
           var crossMin = (fobj && fobj.crossingMin) ? fobj.crossingMin : 30;
-          var bookingStr = (fobj && fobj.booking === 'yes') ? ' (varaa)' : '';
-
-          // On-demand ferry: times empty
+          var booking = fobj ? fobj.booking : 'no';
+          var onDemand = false;
           var allTimes = [];
-          var matchedEntry = null;
+
           if (fobj && fobj.schedules) {
             fobj.schedules.forEach(function (s) {
-              // Match by from/to if available, else direction-agnostic (skagen_jumo)
               var fromToMatch = (!s.from && !s.to) ||
                 (s.from === leg.from && s.to === leg.to);
               if (fromToMatch && scheduleRuns(s, date)) {
                 if ((s.times || []).length === 0) {
-                  // on-demand
-                  matchedEntry = s;
+                  onDemand = true;
                 } else {
-                  matchedEntry = matchedEntry || s;
                   allTimes = allTimes.concat(s.times || []);
                 }
               }
             });
           }
 
-          if (!fobj || !fobj.schedules || fobj.schedules.length === 0) {
-            // No ferry info at all
-            rows.push({ t: hhmm(currentMin), text: '⛴ ' + fromName + ' → ' + toName + bookingStr + ' — ei aikataulutietoja, tarkista' });
-            currentMin += crossMin;
-          } else if (matchedEntry && allTimes.length === 0) {
-            // On-demand (e.g. skagen_jumo)
-            var arriveOnDemand = currentMin + crossMin;
-            rows.push({ t: hhmm(currentMin), text: '⛴ ' + ferryName + ' ' + fromName + ' → ' + toName + bookingStr + ' → ' + hhmm(arriveOnDemand) + ' (tarvittaessa)' });
-            currentMin = arriveOnDemand;
-          } else if (allTimes.length > 0) {
-            // Pick earliest time >= currentMin
-            var sortedTimes = allTimes.slice().sort(function (a, b) { return minutesOf(a) - minutesOf(b); });
-            var chosenTime = null;
-            var late = false;
-            for (var i = 0; i < sortedTimes.length; i++) {
-              if (minutesOf(sortedTimes[i]) >= currentMin) { chosenTime = sortedTimes[i]; break; }
-            }
-            if (!chosenTime) {
-              // No time >= currentMin, take last (flag late)
-              chosenTime = sortedTimes[sortedTimes.length - 1];
-              late = true;
-            }
-            var departMin = minutesOf(chosenTime);
-            var arriveMin = departMin + crossMin;
-            var lateNote = late ? ' ⚠️ myöhässä — tarkista' : '';
-            rows.push({ t: hhmm(departMin), text: '⛴ ' + ferryName + ' ' + fromName + ' → ' + toName + bookingStr + ' → ' + hhmm(arriveMin) + lateNote });
-            currentMin = arriveMin;
-          } else {
-            // matchedEntry found but no times and not on-demand: no service this day
-            rows.push({ t: hhmm(currentMin), text: '⛴ ' + ferryName + ' ' + fromName + ' → ' + toName + ' — ei vuoroa tänä päivänä, tarkista' });
-          }
+          // De-dup and sort
+          var seen = {};
+          allTimes = allTimes.filter(function (t) {
+            if (seen[t]) return false;
+            seen[t] = true;
+            return true;
+          }).sort(function (a, b) { return minutesOf(a) - minutesOf(b); });
+
+          steps.push({
+            type: 'ferry',
+            ferryId: ferryId,
+            vessel: vessel,
+            from: leg.from,
+            to: leg.to,
+            booking: booking,
+            crossingMin: crossMin,
+            onDemand: onDemand,
+            departures: allTimes.map(function (t) {
+              return { time: t, min: minutesOf(t), past: false, latestFeasible: false, reachable: false };
+            }),
+            chosenTime: null       // filled from tripProgress + forward pass
+          });
         }
       });
 
-      return rows;
+      return steps;
     }
 
-    // Day 1 title
+    /* Backward pass: compute latestFeasible per ferry. */
+    function computeLatestFeasible(steps) {
+      var nextFerryLatestMin = null;
+      var bikePadToNextFerry = 0;
+
+      for (var i = steps.length - 1; i >= 0; i--) {
+        var s = steps[i];
+        if (s.type === 'ferry') {
+          if (!s.departures.length || s.onDemand) continue;
+          var latestDepMin;
+          if (nextFerryLatestMin === null) {
+            latestDepMin = s.departures[s.departures.length - 1].min;
+          } else {
+            var deadline = nextFerryLatestMin - bikePadToNextFerry - s.crossingMin;
+            latestDepMin = null;
+            for (var j = s.departures.length - 1; j >= 0; j--) {
+              if (s.departures[j].min <= deadline) { latestDepMin = s.departures[j].min; break; }
+            }
+            if (latestDepMin === null) {
+              latestDepMin = s.departures[0].min;
+            }
+          }
+          for (var k = 0; k < s.departures.length; k++) {
+            if (s.departures[k].min === latestDepMin) s.departures[k].latestFeasible = true;
+          }
+          nextFerryLatestMin = latestDepMin;
+          bikePadToNextFerry = 0;
+        } else if (s.type === 'bike') {
+          var ride = rideMin(s.km);
+          var brk = s.km >= 40 ? 15 : 0;
+          bikePadToNextFerry += ride + brk;
+        }
+      }
+    }
+
+    /* Forward pass: assign departure/arrival minutes. */
+    function forwardPass(steps, dateKey) {
+      var prog = loadProgress();
+      var dayProg = prog[dateKey] || {};
+      var currentMin = 9 * 60; // 09:00
+
+      var nowMin = (function () {
+        var n = new Date();
+        return n.getHours() * 60 + n.getMinutes();
+      })();
+      var isToday = (isoToDate(dateKey).toDateString() === new Date().toDateString());
+
+      for (var i = 0; i < steps.length; i++) {
+        var s = steps[i];
+        if (s.type === 'bike') {
+          s.departMin = currentMin;
+          var ride = rideMin(s.km);
+          s.arriveMin = currentMin + ride;
+          currentMin = s.arriveMin;
+          if (s.km >= 40) currentMin += 15;
+
+        } else if (s.type === 'ferry') {
+          // Mark past departures (today only)
+          if (isToday) {
+            for (var j = 0; j < s.departures.length; j++) {
+              if (s.departures[j].min < nowMin) s.departures[j].past = true;
+            }
+          }
+          // Mark reachable: a departure is reachable if its time >= currentMin
+          for (var k = 0; k < s.departures.length; k++) {
+            s.departures[k].reachable = (s.departures[k].min >= currentMin);
+          }
+
+          // Determine chosen time
+          var confirmed = dayProg[s.ferryId] || null;
+          if (confirmed) {
+            s.chosenTime = confirmed;
+            var confMin = minutesOf(confirmed);
+            currentMin = confMin + s.crossingMin;
+          } else {
+            s.chosenTime = null;
+            // For scheduling downstream: pick earliest reachable
+            var picked = null;
+            for (var k = 0; k < s.departures.length; k++) {
+              if (s.departures[k].reachable) { picked = s.departures[k]; break; }
+            }
+            if (!picked && s.departures.length) picked = s.departures[s.departures.length - 1];
+            if (picked) currentMin = picked.min + s.crossingMin;
+            else currentMin += s.crossingMin; // on-demand fallback
+          }
+        }
+      }
+    }
+
+    function buildDay(dayNum, date, dateKey, title) {
+      var dayLegs = allLegs.filter(function (l) { return l.day === dayNum; });
+      var bikeKm = 0, bikeMin = 0;
+      dayLegs.forEach(function (l) {
+        if (l.mode === 'bike') { bikeKm += (l.km || 0); bikeMin += rideMin(l.km || 0); }
+      });
+
+      var steps = buildDaySteps(dayNum, date);
+      computeLatestFeasible(steps);
+      forwardPass(steps, dateKey);
+
+      return {
+        day: dayNum,
+        date: dateKey,
+        title: title,
+        dir: dir,
+        bikeKm: bikeKm,
+        bikeMin: bikeMin,
+        overnight: dayNum === 1
+          ? 'Restaurang Sybarit B&B (Houtskär) — yö 1'
+          : 'Peterzens Boathouse (Kustavi) — yö 2',
+        steps: steps
+      };
+    }
+
     var title1 = dir === 'cw'
       ? 'Kustavi → Iniö → Houtskär'
       : 'Kustavi → Brändö → Houtskär ⚓';
-    // Day 2 title
     var title2 = dir === 'cw'
       ? 'Houtskär → Brändö → Kustavi ⚓'
       : 'Houtskär → Iniö → Kustavi';
 
-    var rows1 = schedulerForDay(1, d1);
-    // Prepend drive note
-    rows1.unshift({ t: 'aamu', text: 'Aja autolla Kustaviin (Peterzens), pura pyörät.' });
-
-    var rows2 = schedulerForDay(2, d2);
-
     T.dayPlan = [
-      {
-        day: 1, date: d1key, title: title1,
-        rows: rows1,
-        overnight: 'Restaurang Sybarit B&B (Houtskär) — yö 1'
-      },
-      {
-        day: 2, date: d2key, title: title2,
-        rows: rows2,
-        overnight: 'Peterzens Boathouse (Kustavi) — yö 2'
-      }
+      buildDay(1, d1, d1key, title1),
+      buildDay(2, d2, d2key, title2)
     ];
+  }
+
+  /* ---------- renderDayPlan ---------- */
+  function renderDayPlan() {
+    if (SELECTED) {
+      (T.dayPlan || []).forEach(function (dayObj) {
+        (dayObj.steps || []).forEach(function (s) {
+          if (s.type === 'ferry') {
+            s.departures.forEach(function (d) { d.reachable = false; d.past = false; });
+            s.chosenTime = null;
+          } else {
+            s.departMin = null;
+            s.arriveMin = null;
+          }
+        });
+        var prog = loadProgress();
+        var dayProg = prog[dayObj.date] || {};
+        var nowMin = (function () {
+          var n = new Date();
+          return n.getHours() * 60 + n.getMinutes();
+        })();
+        var isToday = (isoToDate(dayObj.date).toDateString() === new Date().toDateString());
+        var currentMin = 9 * 60;
+
+        (dayObj.steps || []).forEach(function (s) {
+          if (s.type === 'bike') {
+            s.departMin = currentMin;
+            s.arriveMin = currentMin + rideMin(s.km);
+            currentMin = s.arriveMin;
+            if (s.km >= 40) currentMin += 15;
+          } else if (s.type === 'ferry') {
+            if (isToday) {
+              s.departures.forEach(function (d) { if (d.min < nowMin) d.past = true; });
+            }
+            s.departures.forEach(function (d) { d.reachable = (d.min >= currentMin); });
+            var confirmed = dayProg[s.ferryId] || null;
+            if (confirmed) {
+              s.chosenTime = confirmed;
+              currentMin = minutesOf(confirmed) + s.crossingMin;
+            } else {
+              var picked = null;
+              for (var k = 0; k < s.departures.length; k++) {
+                if (s.departures[k].reachable) { picked = s.departures[k]; break; }
+              }
+              if (!picked && s.departures.length) picked = s.departures[s.departures.length - 1];
+              currentMin = picked ? picked.min + s.crossingMin : currentMin + s.crossingMin;
+            }
+          }
+        });
+      });
+    }
+
+    var dp = $('#dayPlan');
+    dp.innerHTML = '';
+
+    (T.dayPlan || []).forEach(function (dayObj) {
+      var card = el('div', 'day-card');
+      var d = isoToDate(dayObj.date);
+      card.innerHTML =
+        '<div class="day-card__head"><h3>Päivä ' + dayObj.day + ' · ' + dayObj.title + '</h3>' +
+        '<span class="day-card__date">' + WEEKDAYS_FI[d.getDay()] + ' ' + fmtDateFi(d) + '</span></div>';
+
+      var body = el('div', 'day-card__body');
+
+      /* Ride total chip */
+      if (dayObj.bikeKm > 0) {
+        body.appendChild(el('div', 'day-card__ride',
+          '🚲 ~' + fmtKm(Math.round(dayObj.bikeKm)) + ' km · ~' + fmtDur(dayObj.bikeMin) +
+          ' pyöräaikaa (' + EBIKE_KMH + ' km/h)'));
+      }
+
+      /* Drive note for day 1 */
+      if (dayObj.day === 1) {
+        body.appendChild(el('div', 'day-card__row',
+          '<span class="t">aamu</span><span>Aja autolla Kustaviin (Peterzens), pura pyörät.</span>'));
+      }
+
+      /* Render steps */
+      var prog = loadProgress();
+      var dayProg = prog[dayObj.date] || {};
+
+      (dayObj.steps || []).forEach(function (s) {
+        if (s.type === 'bike') {
+          var tLabel = s.departMin != null ? hhmm(s.departMin) : '—';
+          var text = '🚲 ' + displayName(s.from) + ' → ' + displayName(s.to) +
+            ' · ' + fmtKm(s.km) + ' km · ~' + fmtDur(rideMin(s.km));
+          var row = el('div', 'day-card__row');
+          row.innerHTML = '<span class="t">' + tLabel + '</span><span>' + text + '</span>';
+          body.appendChild(row);
+
+        } else if (s.type === 'ferry') {
+          body.appendChild(renderFerryStep(s, dayObj.date, dayProg));
+        }
+      });
+
+      /* Overnight box */
+      if (dayObj.overnight) {
+        body.appendChild(el('div', 'day-card__overnight',
+          '🛏 Yöpyminen: <b>' + dayObj.overnight + '</b>'));
+      }
+
+      card.appendChild(body);
+      dp.appendChild(card);
+    });
+  }
+
+  /* ---------- renderFerryStep: render one ferry step block ---------- */
+  function renderFerryStep(s, dateKey, dayProg) {
+    var confirmed = dayProg[s.ferryId] || null;
+
+    var wrap = el('div', 'dp-ferry-block');
+
+    /* Header row: icon + route + booking badge + Aikataulu link */
+    var bookBadge = '';
+    if (s.booking === 'yes') bookBadge = ' <span class="dp-badge dp-badge--book">Varaus pakollinen</span>';
+    else if (s.booking === 'recommended') bookBadge = ' <span class="dp-badge dp-badge--book">Varaus suositeltu</span>';
+
+    var head = el('div', 'dp-ferry-block__head');
+    head.innerHTML =
+      '<span class="dp-ferry-icon">⛴</span>' +
+      '<div class="dp-ferry-route">' +
+        '<span class="dp-ferry-from-to">' + displayName(s.from) + ' → ' + displayName(s.to) + '</span>' +
+        bookBadge +
+      '</div>' +
+      '<a class="dp-ferry-sched-link" href="javascript:void(0)" role="button">Aikataulu →</a>';
+
+    /* Wire Aikataulu link */
+    head.querySelector('.dp-ferry-sched-link').addEventListener('click', function (e) {
+      e.preventDefault();
+      openFerrySchedule(s.ferryId, dateKey);
+    });
+
+    wrap.appendChild(head);
+
+    /* Crossing duration sub-line */
+    var sub = el('div', 'dp-ferry-block__sub',
+      '~' + s.crossingMin + ' min ylitys');
+    wrap.appendChild(sub);
+
+    /* On-demand ferry */
+    if (s.onDemand) {
+      wrap.appendChild(el('div', 'dp-ferry-block__ondemand',
+        '⏱ Kulkee tarvittaessa — ei kiinteää aikataulua'));
+      if (confirmed) {
+        /* Confirmed on-demand */
+        var confRow = el('div', 'dp-ferry-block__confirmed');
+        confRow.innerHTML = '✓ klo <b>' + confirmed + '</b>';
+        var clrBtn = el('button', 'dp-clear-btn', 'nollaa');
+        (function (dKey, fId) {
+          clrBtn.addEventListener('click', function () { clearDeparture(dKey, fId); });
+        }(dateKey, s.ferryId));
+        confRow.appendChild(clrBtn);
+        wrap.appendChild(confRow);
+      } else {
+        var ondemandPick = el('div', 'dp-ferry-block__pick-row');
+        var pickBtn = el('button', 'dp-dep-chip dp-dep-chip--ondemand', 'Otin tämän vuoron');
+        (function (fId, dKey) {
+          pickBtn.addEventListener('click', function () {
+            var now = new Date();
+            var t = pad(now.getHours()) + ':' + pad(now.getMinutes());
+            chooseDeparture(dKey, fId, t);
+          });
+        }(s.ferryId, dateKey));
+        ondemandPick.appendChild(pickBtn);
+        wrap.appendChild(ondemandPick);
+      }
+      return wrap;
+    }
+
+    /* No departures */
+    if (!s.departures || !s.departures.length) {
+      wrap.appendChild(el('div', 'dp-ferry-block__ondemand dp-ferry-block__none',
+        '⚠️ Ei vuoroja tänä päivänä — tarkista operaattorilta'));
+      return wrap;
+    }
+
+    /* Confirmed departure: compact confirmed bar + nollaa */
+    if (confirmed) {
+      var confBar = el('div', 'dp-ferry-block__confirmed');
+      var arrMin = minutesOf(confirmed) + s.crossingMin;
+      confBar.innerHTML = '✓ klo <b>' + confirmed + '</b> · perillä ~<b>' + hhmm(arrMin) + '</b>';
+      var clrBtn2 = el('button', 'dp-clear-btn', 'nollaa');
+      (function (dKey, fId) {
+        clrBtn2.addEventListener('click', function () { clearDeparture(dKey, fId); });
+      }(dateKey, s.ferryId));
+      confBar.appendChild(clrBtn2);
+      wrap.appendChild(confBar);
+    }
+
+    /* Departure chips grid */
+    var grid = el('div', 'dp-dep-grid');
+
+    s.departures.forEach(function (dep) {
+      var cls = 'dp-dep-chip';
+      if (confirmed && dep.time === confirmed) {
+        cls += ' dp-dep-chip--chosen';
+      } else if (dep.past) {
+        cls += ' dp-dep-chip--past';
+      } else if (!dep.reachable) {
+        cls += ' dp-dep-chip--unreachable';
+      } else if (dep.latestFeasible) {
+        cls += ' dp-dep-chip--latest';
+      }
+
+      var chip = el('span', cls, dep.time);
+      chip.title = dep.latestFeasible ? 'Viimeinen suositeltava lähtö' : '';
+
+      /* Only tappable if not past and not already confirmed to a different time */
+      var isTappable = !dep.past && !(confirmed && dep.time !== confirmed);
+      if (isTappable) {
+        chip.setAttribute('role', 'button');
+        chip.setAttribute('tabindex', '0');
+        (function (dKey, fId, time) {
+          function doConfirm() {
+            if (confirmed === time) {
+              clearDeparture(dKey, fId);
+            } else {
+              chooseDeparture(dKey, fId, time);
+            }
+          }
+          chip.addEventListener('click', doConfirm);
+          chip.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); doConfirm(); }
+          });
+        }(dateKey, s.ferryId, dep.time));
+      }
+
+      grid.appendChild(chip);
+    });
+
+    wrap.appendChild(grid);
+
+    /* Hint text when nothing confirmed */
+    if (!confirmed) {
+      var hint = el('div', 'dp-ferry-block__hint', 'Napauta vuoroa vahvistaaksesi: "otin tämän"');
+      wrap.appendChild(hint);
+    }
+
+    return wrap;
   }
 
   /* ---------- Module-level selected option ---------- */
   var SELECTED = null;
+  var autoDefault = false; // true when SELECTED is a non-persisted weather auto-default
 
   /* ---------- Tab navigation ---------- */
   var mapInited = false;
@@ -449,25 +825,7 @@
       list.appendChild(row);
     });
 
-    var dp = $('#dayPlan');
-    dp.innerHTML = '';
-    (T.dayPlan || []).forEach(function (day) {
-      var card = el('div', 'day-card');
-      var d = day.date ? isoToDate(day.date) : null;
-      card.innerHTML =
-        '<div class="day-card__head"><h3>Päivä ' + day.day + ' · ' + day.title + '</h3>' +
-        (d ? '<span class="day-card__date">' + WEEKDAYS_FI[d.getDay()] + ' ' + fmtDateFi(d) + '</span>' : '') + '</div>';
-      var body = el('div', 'day-card__body');
-      var dayBikeKm = 0, dayBikeMin = 0;
-      legs.forEach(function (l) { if (l.day === day.day && l.mode === 'bike') { dayBikeKm += (l.km || 0); dayBikeMin += rideMin(l.km); } });
-      if (dayBikeKm > 0) body.appendChild(el('div', 'day-card__ride', '🚲 ~' + Math.round(dayBikeKm) + ' km · ~' + fmtDur(dayBikeMin) + ' pyöräaikaa (' + EBIKE_KMH + ' km/h)'));
-      (day.rows || []).forEach(function (r) {
-        body.appendChild(el('div', 'day-card__row', '<span class="t">' + (r.t || '') + '</span><span>' + r.text + '</span>'));
-      });
-      if (day.overnight) body.appendChild(el('div', 'day-card__overnight', '🛏 Yöpyminen: <b>' + day.overnight + '</b>'));
-      card.appendChild(body);
-      dp.appendChild(card);
-    });
+    renderDayPlan();
   }
 
   /* ---------- FERRIES VIEW ---------- */
@@ -804,8 +1162,15 @@
   var SEL_KEY = 'skiftet_sel_v1';
   var optLoaded = false, optLoading = false;
 
-  var SKIFTET_NO_RUN_DOW = [1, 6];
-  function skiftetRunsOn(date) { return SKIFTET_NO_RUN_DOW.indexOf(date.getDay()) < 0; }
+  // Skiftet (Brändö↔Houtskär) runs only on the weekdays it has scheduled departures.
+  function skiftetRunsOn(date) {
+    var f = T.ferries && T.ferries.skiftet;
+    if (!f || !f.schedules) return true;
+    var dow = date.getDay();
+    return f.schedules.some(function (s) {
+      return s.dow && s.dow.indexOf(dow) >= 0 && (s.times || []).length > 0;
+    });
+  }
   function dateFromKey(k) { var p = k.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
 
   function scoreOption(brWx, iniWx) {
@@ -845,9 +1210,10 @@
   }
 
   /* ---------- applyOption ---------- */
-  function applyOption(opt, noNav) {
+  function applyOption(opt, noNav, noPersist) {
     var dir = opt.direction; // 'cw' or 'ccw'
     SELECTED = opt;
+    autoDefault = !!noPersist; // a non-persisted auto default the user can still override
 
     // Update TRIP meta
     T.meta.direction = dir === 'cw' ? 'Myötäpäivään' : 'Vastapäivään';
@@ -858,8 +1224,8 @@
     T.legs = generateLegs(dir);
     generateDayPlan(dir, opt.d1key, opt.d2key);
 
-    // Persist selection
-    try { localStorage.setItem(SEL_KEY, JSON.stringify({ direction: dir, d1key: opt.d1key, d2key: opt.d2key })); } catch (e) {}
+    // Persist selection (skip for a soft auto-default so weather can re-pick next load)
+    if (!noPersist) { try { localStorage.setItem(SEL_KEY, JSON.stringify({ direction: dir, d1key: opt.d1key, d2key: opt.d2key })); } catch (e) {} }
 
     // Update header subtitle and route title
     var sub = document.querySelector('.app-header__sub');
@@ -1018,6 +1384,12 @@
     return options;
   }
 
+  // If the user has not explicitly chosen, apply the top-ranked option as a soft
+  // default so Reitti/Sää/Lautat show a valid, weather-optimal plan automatically.
+  function maybeAutoDefault(opts) {
+    if ((!SELECTED || autoDefault) && opts && opts.length) applyOption(opts[0], true, true);
+  }
+
   function ensureOptions(force) {
     if (optLoading) return;
     var cached = null;
@@ -1028,11 +1400,13 @@
     if (cached && cached.options) {
       buildOptionsUI(cached.options, cached.ts);
       optLoaded = true;
+      maybeAutoDefault(cached.options);
     } else if (wxCached && wxCached.data) {
       var opts = computeOptions(wxCached.data);
       buildOptionsUI(opts, wxCached.ts);
       optLoaded = true;
       try { localStorage.setItem(OPT_KEY, JSON.stringify({ ts: wxCached.ts, options: opts })); } catch (e) {}
+      maybeAutoDefault(opts);
     }
 
     if (!force && optLoaded && navigator.onLine === false) return;
@@ -1068,6 +1442,7 @@
         try { localStorage.setItem(WX_KEY, JSON.stringify({ ts: ts, data: results })); } catch (e) {}
       }
       buildOptionsUI(opts, ts);
+      maybeAutoDefault(opts);
       optLoaded = optLoaded || ok;
       optLoading = false;
       if (!ok) $('#optionsUpdated').textContent = 'Sään haku epäonnistui.';

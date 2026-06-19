@@ -479,4 +479,209 @@ h1, h2, h3, p { margin: 0; }
   cursor: pointer;
   border-radius: 6px;
 }
+
+/* ===================================================================
+   Day-plan ferry block — new Reitti upgrade styles
+   =================================================================== */
+
+/* Container */
+.dp-ferry-block {
+  margin: 6px 0;
+  border: 1.5px solid #cfe3f7;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #eef6fd;
+}
+
+/* Header row */
+.dp-ferry-block__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px 6px;
+  background: #daeefa;
+  border-bottom: 1px solid #cfe3f7;
+  flex-wrap: wrap;
+}
+.dp-ferry-icon {
+  font-size: 1.05rem;
+  flex-shrink: 0;
+}
+.dp-ferry-route {
+  flex: 1;
+  min-width: 0;
+  font-weight: 800;
+  font-size: .9rem;
+  color: var(--ferry);
+  line-height: 1.25;
+}
+.dp-ferry-from-to {
+  display: inline;
+}
+.dp-ferry-sched-link {
+  flex-shrink: 0;
+  font-size: .74rem;
+  font-weight: 700;
+  color: var(--ferry);
+  text-decoration: none;
+  padding: 3px 8px;
+  border: 1px solid #cfe3f7;
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dp-ferry-sched-link:active { opacity: .7; }
+
+/* Sub line (crossing duration) */
+.dp-ferry-block__sub {
+  font-size: .74rem;
+  color: var(--muted);
+  padding: 3px 12px 6px;
+}
+
+/* On-demand / no-service notices */
+.dp-ferry-block__ondemand {
+  font-size: .82rem;
+  color: var(--muted);
+  padding: 6px 12px 8px;
+  font-style: italic;
+}
+.dp-ferry-block__none {
+  color: #c92a2a;
+  font-style: normal;
+}
+
+/* Confirmed departure bar */
+.dp-ferry-block__confirmed {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: #d3f9d8;
+  border-bottom: 1px solid #b2f2bb;
+  font-size: .86rem;
+  font-weight: 600;
+  color: #2b8a3e;
+}
+.dp-ferry-block__confirmed b { color: #1c6530; }
+
+/* Nollaa / clear button */
+.dp-clear-btn {
+  border: 1px solid #b2f2bb;
+  background: #fff;
+  color: var(--muted);
+  font-size: .72rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  margin-left: auto;
+}
+.dp-clear-btn:active { opacity: .7; }
+
+/* Departure chip grid */
+.dp-dep-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 8px 12px 10px;
+}
+
+/* Base departure chip */
+.dp-dep-chip {
+  display: inline-block;
+  font-size: .82rem;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1.5px solid #cfe3f7;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+  transition: box-shadow .15s, border-color .15s;
+  -webkit-user-select: none;
+}
+.dp-dep-chip:active { transform: scale(.95); }
+
+/* Latest-feasible: teal highlight */
+.dp-dep-chip--latest {
+  border-color: var(--teal);
+  background: #d3f4f7;
+  color: var(--teal-dark);
+  font-weight: 800;
+  box-shadow: 0 0 0 1.5px var(--teal);
+}
+
+/* Past / unreachable: dimmed */
+.dp-dep-chip--past,
+.dp-dep-chip--unreachable {
+  opacity: .35;
+  cursor: default;
+  pointer-events: none;
+}
+
+/* Chosen / confirmed chip */
+.dp-dep-chip--chosen {
+  background: var(--land);
+  border-color: #2b8a3e;
+  color: #fff;
+  font-weight: 800;
+  cursor: default;
+}
+.dp-dep-chip--chosen::before {
+  content: '✓ ';
+}
+
+/* On-demand "I took this" button */
+.dp-dep-chip--ondemand {
+  background: var(--teal);
+  border-color: var(--teal-dark);
+  color: #fff;
+  font-weight: 700;
+  font-size: .8rem;
+}
+
+/* Hint text */
+.dp-ferry-block__hint {
+  font-size: .72rem;
+  color: var(--muted);
+  padding: 0 12px 8px;
+  font-style: italic;
+}
+
+/* Pick row (on-demand confirm) */
+.dp-ferry-block__pick-row {
+  padding: 6px 12px 8px;
+}
+
+/* Badge within day plan ferry block */
+.dp-badge {
+  display: inline-block;
+  font-size: .65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+.dp-badge--book {
+  background: #ffe3e3;
+  color: #c92a2a;
+}
+
+/* Flash animation for Aikataulu → scroll target */
+@keyframes ferry-flash {
+  0%   { box-shadow: 0 0 0 3px var(--teal), var(--shadow); }
+  50%  { box-shadow: 0 0 0 6px rgba(11,114,133,.35), var(--shadow); }
+  100% { box-shadow: 0 0 0 2px var(--teal), var(--shadow); }
+}
+.ferry-card--flash {
+  animation: ferry-flash .5s ease-in-out 2;
+}
+
+/* Day-card rows with ferry blocks need no border-bottom of their own */
+.day-card__body .dp-ferry-block {
+  margin: 4px 0 8px;
+}
 .a2hs-toast__close:hover { background: var(--bg); }

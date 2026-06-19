@@ -6,7 +6,7 @@ window.TRIP = {
     direction: 'Myötäpäivään',
     tripStart: '2026-06-22',   // ride day 1 — Iniö (poutainen)
     tripEnd: '2026-06-23',     // ride day 2 — Brändö (paras pyöräsää)
-    updated: '2026-06-19',
+    updated: '2026-06-20',
     season: 'Kesä 2026',
     ebikeKmh: 20,        // sähköpyörän realistinen keskinopeus
     breakMinPerHour: 15  // vähintään 15 min tauko / tunti
@@ -47,7 +47,7 @@ window.TRIP = {
     { day: 1, from: 'mossala',   to: 'nasby',     mode: 'bike',  km: 11,   island: 'Houtskär', note: 'Björkö–Mossala kaapelilossi' },
     // DAY 2 — Ti 23.6  Houtskär → Brändö → Kustavi  (paras pyöräsää)
     { day: 2, from: 'nasby',     to: 'roslax',    mode: 'bike',  km: 6,    island: 'Houtskär', note: 'Lyhyt kaapelilossi matkalla' },
-    { day: 2, from: 'roslax',    to: 'torsholma', mode: 'ferry', km: 55,   ferry: 'skiftet', note: 'Skiftet-ylitys ~2,5 h — varaa ma klo 17 mennessä' },
+    { day: 2, from: 'roslax',    to: 'torsholma', mode: 'ferry', km: 55,   ferry: 'skiftet', note: 'Skiftet-ylitys ~2 h — varaa edellisenä päivänä klo 17' },
     { day: 2, from: 'torsholma', to: 'brando_kby',mode: 'bike',  km: 8.6,  island: 'Brändö', note: '' },
     { day: 2, from: 'brando_kby',to: 'ava',       mode: 'bike',  km: 12.5, island: 'Brändö', note: 'Lounastauko' },
     { day: 2, from: 'ava',       to: 'osnas',     mode: 'ferry', km: 25,   ferry: 'adan',   note: 'Ådan — maksuton tähän suuntaan' },
@@ -75,29 +75,32 @@ window.TRIP = {
         { label: 'Varausportaali', url: 'https://boka.alandstrafiken.ax' }
       ],
       schedules: [
-        { direction: 'Osnäs → Åva', from: 'osnas', to: 'ava', days: 'Ma', dow: [1], season: 'Kesä', times: ['10:35', '13:40', '16:35', '18:40'] },
+        { direction: 'Osnäs → Åva', from: 'osnas', to: 'ava', days: 'Ma', dow: [1], season: 'Kesä', times: ['10:05', '13:40', '16:35', '18:40'] },
         { direction: 'Osnäs → Åva', from: 'osnas', to: 'ava', days: 'Ti–La', dow: [2, 3, 4, 5, 6], season: 'Kesä', times: ['06:30', '10:35', '13:35', '16:35', '19:40'] },
-        { direction: 'Osnäs → Åva', from: 'osnas', to: 'ava', days: 'Su', dow: [0], season: 'Kesä', times: ['10:35', '12:45', '15:05', '19:00'] },
-        { direction: 'Åva → Osnäs', from: 'ava', to: 'osnas', days: 'Ma', dow: [1], season: 'Kesä', times: ['07:05', '12:45', '15:30', '17:30', '20:35'] },
+        { direction: 'Osnäs → Åva', from: 'osnas', to: 'ava', days: 'Su', dow: [0], season: 'Kesä', times: ['10:35', '12:45', '16:05', '19:00'] },
+        { direction: 'Åva → Osnäs', from: 'ava', to: 'osnas', days: 'Ma', dow: [1], season: 'Kesä', times: ['07:05', '12:35', '15:30', '17:30', '20:35'] },
         { direction: 'Åva → Osnäs', from: 'ava', to: 'osnas', days: 'Ti–La', dow: [2, 3, 4, 5, 6], season: 'Kesä', times: ['08:30', '12:30', '15:30', '18:30', '21:35'] },
-        { direction: 'Åva → Osnäs', from: 'ava', to: 'osnas', days: 'Su', dow: [0], season: 'Kesä', times: ['11:30', '15:00', '17:00'] }
+        { direction: 'Åva → Osnäs', from: 'ava', to: 'osnas', days: 'Su', dow: [0], season: 'Kesä', times: ['11:30', '15:00', '17:30'] }
       ]
     },
     skiftet: {
       name: 'Torsholma ↔ Roslax (Skiftet-ylitys)',
-      operator: 'Finferries · yhteysalus (Rosala 2 / Finnö)',
-      crossingMin: 150,
+      operator: 'Finferries · m/s Rosala 2',
+      crossingMin: 135,
       booking: 'yes',
       price: 'Maksuton matkustajalle ja pyörälle.',
-      note: 'VARAUS PAKOLLINEN viimeistään edellisenä päivänä klo 17 (booking.finferries.fi). EI liikennöi maanantaisin eikä lauantaisin. Pitkä ulkosaaristoylitys ~2–2,5 h, useita pysähdyksiä. Täsmäajat vaihtelevat päivittäin — VAHVISTA ja varaa ennen lähtöä.',
+      note: 'VARAUS PAKOLLINEN viimeistään edellisenä päivänä klo 17 (su-vuorot la klo 14 mennessä) — booking.finferries.fi. Liikennöi VAIN ke, to, pe ja su — ei ma, ti eikä la. Pitkä ulkosaaristoylitys ~2–2,5 h, useita pysähdyksiä. Juhannus: pe 19.6. ja la 20.6. ei liikennettä.',
       links: [
         { label: 'Varaa (Finferries booking)', url: 'https://booking.finferries.fi' },
         { label: 'Houtskärin reitin aikataulu (PDF)', url: 'https://www.finferries.fi/media/aikataulut-2026/houtskarin-reitti-kesa-6.6.-18.8.2026.pdf' }
       ],
       schedules: [
-        { direction: 'Torsholma → Roslax', from: 'torsholma', to: 'roslax', days: 'Ti–Pe, Su (ei ma/la)', dow: [0, 2, 3, 4, 5], season: 'Kesä', times: ['15:15'] },
-        { direction: 'Roslax → Torsholma', from: 'roslax', to: 'torsholma', days: 'Ke, To, Pe, Su', dow: [0, 3, 4, 5], season: 'Kesä', times: ['12:20'] },
-        { direction: 'Roslax → Torsholma', from: 'roslax', to: 'torsholma', days: 'Ti', dow: [2], season: 'Kesä', times: ['13:35'] }
+        { direction: 'Roslax → Torsholma', from: 'roslax', to: 'torsholma', days: 'Ke, To', dow: [3, 4], season: 'Kesä', times: ['12:35'] },
+        { direction: 'Roslax → Torsholma', from: 'roslax', to: 'torsholma', days: 'Pe', dow: [5], season: 'Kesä', times: ['12:35', '18:10'] },
+        { direction: 'Roslax → Torsholma', from: 'roslax', to: 'torsholma', days: 'Su', dow: [0], season: 'Kesä', times: ['11:00', '17:40'] },
+        { direction: 'Torsholma → Roslax', from: 'torsholma', to: 'roslax', days: 'Ke, To', dow: [3, 4], season: 'Kesä', times: ['15:15'] },
+        { direction: 'Torsholma → Roslax', from: 'torsholma', to: 'roslax', days: 'Pe', dow: [5], season: 'Kesä', times: ['15:15', '21:10'] },
+        { direction: 'Torsholma → Roslax', from: 'torsholma', to: 'roslax', days: 'Su', dow: [0], season: 'Kesä', times: ['14:20', '20:20'] }
       ]
     },
     replot: {
@@ -156,52 +159,30 @@ window.TRIP = {
     {
       night: 1, name: 'Restaurang Sybarit & Bed and Breakfast', address: 'Näsbyvägen 189, 21760 Houtskär',
       lat: 60.2228, lon: 21.3685, link: 'https://www.bedandbreakfast.eu/en/a/XvTueNhFQ4O8/bed-breakfast-restaurang-sybarit',
-      note: 'Yö 1 (ma 22.6.). Näsbyn kylässä, ~200 m vierasvenesatamasta. Ravintola samassa — sopii myöhäiseenkin illalliseen.'
+      note: 'Yö 1 · Houtskär (Näsby), ~200 m vierasvenesatamasta. Ravintola samassa.'
     },
     {
       night: 2, name: 'Peterzens Boathouse', address: 'Parattulan rantatie 16, 23360 Kustavi',
       lat: 60.4950, lon: 21.4400, link: 'https://peterzens.com',
-      note: 'Yö 2 (ti 23.6.) ja reissun tukikohta: jätä auto tänne maanantaina, aja kotiin keskiviikkona. Kustavissa Laupusten niemellä, ~500 m Heponiemen lauttarannasta. (Huom: ei Brändöllä/Lapolla.)'
+      note: 'Yö 2 · Kustavi, reissun tukikohta — jätä auto tänne ja aja kotiin lopuksi. Laupusten niemellä, ~500 m Heponiemen lauttarannasta. (Huom: ei Brändöllä/Lapolla.)'
     }
   ],
 
-  /* ---- Day-by-day plan ---- */
-  dayPlan: [
-    {
-      day: 1, date: '2026-06-22', title: 'Turku → Kustavi → Iniö → Houtskär',
-      rows: [
-        { t: '10:00', text: 'Lähtö Turusta autolla (perhe + pyörät) Kustaviin (~1 h). Perillä Peterzens\'illä ~11:15: pura pyörät, jätä auto, lounas Kustavissa.' },
-        { t: '11:45', text: '⛴ Sterna Heponiemi → Kannvik (maksuton) → 12:15. Tavoittele tätä, jos purku sujuu ripeästi → rento iltapäivä. Varmin vaihtoehto on 15:20 (→ Sybarit ~19:35).' },
-        { t: '12:20', text: 'Pyöräily Iniössä: Kannvik → Jumo → (Skagen–Jumo lossi) → Dalen (~9 km). Lounas/uimatauko Iniössä.' },
-        { t: '15:15', text: '⛴ Replot Dalen → Mossala (pyörä 12 €, varaa). Perillä ~16:15. Huom: viimeinen vuoro on 17:45.' },
-        { t: '16:20', text: 'Pyöräily Mossala → Näsby (~11 km) → Sybarit B&B ~17:10. Illallinen ravintolassa.' }
-      ],
-      overnight: 'Restaurang Sybarit B&B (Houtskär / Näsby) — yö 1'
-    },
-    {
-      day: 2, date: '2026-06-23', title: 'Houtskär → Brändö → Kustavi  ☀️ paras Åva–Brändö-sää',
-      rows: [
-        { t: 'aamu', text: 'Aamiainen ja rauhallinen aamu Houtskärissä.' },
-        { t: '12:45', text: 'Pyöräily Näsby → Roslax (~6 km).' },
-        { t: '13:35', text: '⛴ Skiftet Roslax → Torsholma (~2,5 h, kaunis ulkosaaristoreitti). Perillä ~16:05. Varaa ma klo 17 mennessä!' },
-        { t: '16:10', text: 'Pyöräily Brändöllä: Torsholma → kirkonkylä → Åva (~21 km). Taukoja ja eväät matkalla.' },
-        { t: '18:30', text: '⛴ Ådan Åva → Osnäs (maksuton tähän suuntaan). Perillä ~19:15.' },
-        { t: '19:20', text: 'Pyöräily Osnäs → Kivimaa → Peterzens (~21 km). Perillä ~20:40 (valoisaa ~22:50 asti).' }
-      ],
-      overnight: 'Peterzens Boathouse (Kustavi) — yö 2. Ke 24.6. paluu autolla Turkuun.'
-    }
-  ],
+  /* ---- Day-by-day plan ----
+     Generated at runtime from the selected option (Vaihtoehdot → Valitse),
+     so the day plan always matches the chosen direction & dates. */
+  dayPlan: [],
 
   /* ---- Weather spots (one fetch covers all) ---- */
   weatherSpots: ['peterzens', 'ava', 'nasby', 'kannvik'],
 
   /* ---- Info notes ---- */
   infoNotes: [
-    '☀️ <b>Suunnitelma on optimoitu ensi viikon sääennusteen mukaan</b> (myötäpäivään): Brändö-päivä on <b>ti 23.6.</b> (poutaa, tuuli ~6 m/s) ja Iniö-päivä <b>ma 22.6.</b> (poutaa). Näin vältetään ke 24.6. ennustettu sade (~55 %). Vahvista ennuste Sää-välilehdeltä lähempänä lähtöä.',
-    '🚲 Koko lenkki ~120 km, josta pyöräillen ~69 km — loput meritse lautoilla. Sähköpyörällä (~20 km/h) ja 15 min tauko/tunti: päivä 1 (Iniö) ~20 km (~1 h ajoa), päivä 2 (Brändö) ~48 km (~2 h 24 min ajoa). Maasto on loivaa.',
-    '🚗 Autolla Turusta Kustaviin (~1 h); jätä auto Peterzens\'ille (tukikohta). Ma 22.6. lähtö Turusta klo 10 → tavoittele Sterna 11:45 Heponiemestä (rento Iniö-iltapäivä). Varmin yhteys on 15:20, jolloin perillä Sybaritilla ~19:35. Paluu autolla ke 24.6.',
-    '🎟️ Varaa lautat etukäteen: <b>Skiftet</b> (ti 23.6. Roslax→Torsholma) viimeistään ma klo 17, ja <b>Ådan</b> (ti 23.6. Åva→Osnäs) — molemmat vaativat varauksen. <b>Replot</b> (ma 22.6. Dalen→Mossala) on hyvä varata sekin. <b>Sterna</b> (Heponiemi↔Kannvik) on ilmainen eikä vaadi varausta.',
-    '⚠️ Skiftet-lautta (Roslax↔Torsholma) <b>ei liikennöi maanantaisin eikä lauantaisin</b> — siksi Brändö-päivä on ti 23.6. Tiistain lähtö Roslaxista on n. klo 13.35, ja ~2,5 h ylitys tekee päivästä pitkän (perillä Kustavissa ~20.40, valoisaa silti ~22.50 asti).',
+    '☀️ <b>Valitse matkapäivät Vaihtoehdot-välilehdeltä.</b> Sovellus järjestää 2 päivän lenkkivaihtoehdot tuoreen sääennusteen mukaan ja korostaa parhaan Brändö-päivän. Brändö-päivä voi olla vain ke, to, pe tai su (Skiftet-lautan päivät).',
+    '🚲 Koko lenkki ~120 km, josta pyöräillen ~69 km — loput meritse lautoilla. Sähköpyörällä (~20 km/h) ja 15 min tauko/tunti pyöräaikaa ~3,5 h. Toinen päivä on selvästi pidempi (Brändö-osuus ~48 km). Maasto on loivaa.',
+    '🚗 Autolla Turusta Kustaviin (~1 h); jätä auto Peterzens\'ille (reissun tukikohta). Aja perille matkan ensimmäisenä aamuna ja aloita lenkki sieltä; paluu autolla viimeisen päivän jälkeen.',
+    '🎟️ Varaa lautat etukäteen: <b>Skiftet</b> (Brändö↔Houtskär) viimeistään edellisenä päivänä klo 17, ja <b>Ådan</b> (Osnäs↔Åva) — molemmat vaativat varauksen. <b>Replot</b> (Mossala↔Dalen) on hyvä varata sekin. <b>Sterna</b> (Heponiemi↔Kannvik) on ilmainen eikä vaadi varausta.',
+    '⚠️ Skiftet-lautta (Brändö↔Houtskär, m/s Rosala 2) liikennöi <b>vain ke, to, pe ja su</b> — ei ma, ti eikä la. Ylitys ~2–2,5 h. Juhannuksena (pe 19.6. & la 20.6.) ei liikennettä.',
     '🌬️ Tarkista tuuli ennen lähtöä — saaristossa vastatuuli avoimilla pätkillä on isoin rasitus. Tuulen suunta ja nopeus näkyvät Sää-välilehdellä (Ilmatieteen laitoksen ennuste).',
     '🌧️ Sadetutka: Kartta-välilehdellä 🌧️-painike näyttää edellisen tunnin sadealueet animaationa (Ilmatieteen laitoksen tutkadata). Mitä punaisempi, sitä rankempi sade. Vaatii verkkoyhteyden.',
     '💧 Ota mukaan vettä ja eväitä; palvelut ovat saarilla harvassa. Näsbyssä ja Mossalassa on ravintolat, Kustavissa kauppa.',
@@ -211,8 +192,8 @@ window.TRIP = {
 
   /* ---- Sources & things to verify ---- */
   dataGaps: [
-    'Skiftet (ti 23.6. Roslax→Torsholma, n. klo 13.35, ~2,5 h) on koko reissun KRIITTISIN yhteys: vahvista tiistain täsmälähtö Finferriesin PDF:stä ja VARAA viimeistään ma klo 17. Jos aika on toinen, koko tiistai siirtyy.',
-    'Ådan (ti 23.6. Åva→Osnäs, esim. klo 18.30): varaus pakollinen — vahvista täsmäaika ja varaa alandstrafiken.ax. Tähän suuntaan (Åvasta mantereelle) matka on maksuton.',
+    'Skiftet (Brändö↔Houtskär) on reissun kriittisin yhteys: liikennöi vain ke/to/pe/su, varaus pakollinen viimeistään edellisenä päivänä klo 17 (su-vuorot la klo 14). Vahvista täsmäajat Finferriesin PDF:stä.',
+    'Ådan (Osnäs↔Åva): varaus pakollinen — vahvista täsmäaika ja varaa alandstrafiken.ax. Suunta Åva→Osnäs (mantereelle) on maksuton.',
     'Replot (Mossala→Dalen) ja Sterna (Kannvik→Heponiemi): ajat vahvistettu Finferriesin 2026 PDF:istä, mutta tarkista poikkeukset ennen matkaa.',
     'Kaapelilossit (Skagen–Jumo, Björkö–Mossala, Roslax–Kivimo) kulkevat tarvittaessa ilman kiinteää aikataulua.',
     'Joidenkin pienten paikkojen (Brändön kirkonkylä, Kivimo) koordinaatit ovat likimääräisiä.'
