@@ -85,6 +85,21 @@
       </div>
     </section>
 
+    <!-- OPTIONS -->
+    <section id="view-options" class="view" aria-label="Vaihtoehdot">
+      <div class="scroll-pad">
+        <div class="weather-head">
+          <div>
+            <h2 class="section-title section-title--flush">Vaihtoehdot</h2>
+            <p class="muted small">2 päivän lenkkivaihtoehdot · paremmuusjärjestyksessä</p>
+          </div>
+          <button id="refreshOptions" class="pill-btn">↻ Päivitä</button>
+        </div>
+        <p class="muted small" id="optionsUpdated"></p>
+        <div id="optionsList" class="options-list"></div>
+      </div>
+    </section>
+
     <!-- INFO -->
     <section id="view-info" class="view" aria-label="Info">
       <div class="scroll-pad">
@@ -104,10 +119,12 @@
     <button class="tab" data-view="route"><span class="tab__icon">🚲</span><span class="tab__label">Reitti</span></button>
     <button class="tab" data-view="ferries"><span class="tab__icon">⛴️</span><span class="tab__label">Lautat</span></button>
     <button class="tab" data-view="weather"><span class="tab__icon">🌤️</span><span class="tab__label">Sää</span></button>
+    <button class="tab" data-view="options"><span class="tab__icon">⚖️</span><span class="tab__label">Vaihtoehdot</span></button>
     <button class="tab" data-view="info"><span class="tab__icon">ℹ️</span><span class="tab__label">Info</span></button>
   </nav>
 
   <script src="vendor/leaflet.js"></script>
+  <script src="geometry.js"></script>
   <script src="data.js"></script>
   <script src="app.js"></script>
 </body>

@@ -201,7 +201,7 @@ h1, h2, h3, p { margin: 0; }
   height: calc(var(--tabbar-h) + var(--safe-bottom));
   padding-bottom: var(--safe-bottom);
   background: #fff; border-top: 1px solid var(--line);
-  display: grid; grid-template-columns: repeat(5, 1fr);
+  display: grid; grid-template-columns: repeat(6, 1fr);
   box-shadow: 0 -1px 4px rgba(0,0,0,.06);
 }
 .tab { border: none; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--muted); cursor: pointer; padding: 4px 0;}
@@ -234,4 +234,139 @@ h1, h2, h3, p { margin: 0; }
   .app-header h1 { font-size: 1.25rem; }
   .scroll-pad { max-width: 720px; margin: 0 auto; }
   .day-plan, .ferry-list, .weather-list, .lodging-list { max-width: 720px; }
+}
+
+/* Options view */
+.options-list { display: flex; flex-direction: column; gap: 14px; margin-top: 10px; }
+
+.opt-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.opt-card--best {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 2px var(--teal), var(--shadow);
+}
+
+.opt-card__head {
+  padding: 11px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #eef6f7;
+  border-bottom: 1px solid var(--line);
+}
+.opt-card--best .opt-card__head { background: #d3f4f7; }
+
+.opt-card__dir { display: flex; align-items: center; gap: 10px; }
+.opt-dir-icon { font-size: 1.5rem; color: var(--teal); }
+.opt-dir-name { font-size: .96rem; font-weight: 800; color: var(--teal-dark); }
+.opt-dir-sub { font-size: .72rem; color: var(--muted); margin-top: 1px; }
+
+.opt-best-badge {
+  display: inline-block;
+  background: var(--teal);
+  color: #fff;
+  font-size: .72rem;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.opt-card__body { padding: 0 0 10px; }
+
+/* Day strip inside an option card */
+.opt-day-strip {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr 1fr 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  row-gap: 0;
+  align-items: center;
+  padding: 9px 14px;
+  border-bottom: 1px dashed var(--line);
+}
+.opt-day-strip:last-of-type { border-bottom: none; }
+.opt-day-strip--highlight {
+  background: #f0fbfc;
+  border-left: 3px solid var(--teal);
+}
+
+.opt-day-label {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: .72rem;
+  font-weight: 800;
+  color: var(--teal-dark);
+  text-transform: uppercase;
+  letter-spacing: .3px;
+}
+.opt-day-date {
+  grid-column: 2 / 5;
+  grid-row: 1;
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.opt-day-icon {
+  grid-column: 1;
+  grid-row: 2;
+  font-size: 1.55rem;
+  line-height: 1;
+  padding-top: 4px;
+}
+.opt-day-desc {
+  grid-column: 2;
+  grid-row: 2;
+  font-size: .74rem;
+  color: var(--muted);
+  padding-top: 4px;
+  line-height: 1.3;
+}
+.opt-day-temp {
+  grid-column: 3;
+  grid-row: 2;
+  font-size: .86rem;
+  font-weight: 800;
+  color: var(--ink);
+  padding-top: 4px;
+  white-space: nowrap;
+}
+.opt-tmin { font-weight: 400; color: var(--muted); font-size: .78rem; }
+.opt-day-wind {
+  grid-column: 4;
+  grid-row: 2;
+  font-size: .74rem;
+  font-weight: 700;
+  color: var(--teal-dark);
+  padding-top: 4px;
+  white-space: nowrap;
+}
+.opt-day-rain {
+  grid-column: 2;
+  grid-row: 3;
+  font-size: .68rem;
+  color: var(--ferry);
+  padding-top: 2px;
+}
+
+.opt-verdict {
+  margin: 6px 14px 2px;
+  padding: 7px 10px;
+  background: #f7fbfc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: .78rem;
+  color: var(--ink);
+}
+.opt-verdict b { color: var(--teal-dark); }
+
+@media (min-width: 640px) {
+  .options-list { max-width: 720px; }
 }

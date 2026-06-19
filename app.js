@@ -104,6 +104,7 @@
       else if (window._map) setTimeout(function () { window._map.invalidateSize(); }, 60);
     }
     if (name === 'weather') ensureWeather();
+    if (name === 'options') ensureOptions();
   }
   tabs.forEach(function (t) {
     t.addEventListener('click', function () { showView(t.getAttribute('data-view')); });
@@ -150,9 +151,29 @@
     legs.forEach(function (leg) {
       var a = place(leg.from), b = place(leg.to);
       if (!hasCoord(a) || !hasCoord(b)) return;
+      var ferry = leg.mode === 'ferry';
+      var txt = (ferry ? '⛴ ' : '🚲 ') + (leg.km != null ? leg.km + ' km' : '');
+      if (!ferry) {
+        var geom = window.ROUTE_GEOM && (
+          ROUTE_GEOM[leg.from + '>' + leg.to] ||
+          (ROUTE_GEOM[leg.to + '>' + leg.from] ? ROUTE_GEOM[leg.to + '>' + leg.from].slice().reverse() : null)
+        );
+        if (geom && geom.length >= 2) {
+          L.polyline(geom, {
+            color: '#e8590c',
+            weight: 5,
+            opacity: 0.9,
+            dashArray: null,
+            lineCap: 'round'
+          }).addTo(map);
+          geom.forEach(function (pt) { bounds.push(pt); });
+          var midPt = geom[Math.floor(geom.length / 2)];
+          L.marker(midPt, { icon: distLabel('bike', txt), interactive: false, keyboard: false }).addTo(map);
+          return;
+        }
+      }
       var latlngs = [[a.lat, a.lon], [b.lat, b.lon]];
       bounds.push(latlngs[0], latlngs[1]);
-      var ferry = leg.mode === 'ferry';
       L.polyline(latlngs, {
         color: ferry ? '#1971c2' : '#e8590c',
         weight: ferry ? 4 : 5,
@@ -161,7 +182,6 @@
         lineCap: 'round'
       }).addTo(map);
       var mid = [(a.lat + b.lat) / 2, (a.lon + b.lon) / 2];
-      var txt = (ferry ? '⛴ ' : '🚲 ') + (leg.km != null ? leg.km + ' km' : '');
       L.marker(mid, { icon: distLabel(ferry ? 'ferry' : 'bike', txt), interactive: false, keyboard: false }).addTo(map);
     });
 
@@ -589,6 +609,265 @@
   }
 
   $('#refreshWeather').addEventListener('click', function () { ensureWeather(true); });
+
+  /* ---------- OPTIONS VIEW (2-day loop comparison, ranked by weather) ---------- */
+  var OPT_KEY = 'skiftet_opts_v1';
+  var optLoaded = false, optLoading = false;
+
+  // Skiftet runs only on days NOT in this list (0=Su,1=Mo,2=Tu,...,6=Sa)
+  // data.js: dow: [0, 2, 3, 4, 5]  → does NOT run Mon(1) or Sat(6)
+  var SKIFTET_NO_RUN_DOW = [1, 6]; // Monday, Saturday
+
+  function skiftetRunsOn(date) {
+    var dow = date.getDay();
+    return SKIFTET_NO_RUN_DOW.indexOf(dow) < 0;
+  }
+
+  // dateFromKey('2026-06-22') → Date at local midnight
+  function dateFromKey(k) { var p = k.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+
+  // Score: lower = better. Heavily weights the Brändö/Åva day (the exposed crossing day).
+  function scoreOption(brWx, iniWx) {
+    return brWx.pop * 1.0
+      + brWx.precip * 15
+      + brWx.windMax * 1.5
+      + iniWx.pop * 0.4
+      + iniWx.precip * 5
+      - brWx.tmax * 0.4;
+  }
+
+  // Short verdict sentence for the Brändö day
+  function brandoVerdict(brWx) {
+    var parts = [];
+    var si = symInfo(brWx.sym);
+    parts.push(si.t);
+    if (brWx.windMax <= 5) parts.push('tyyni');
+    else if (brWx.windMax <= 8) parts.push('kohtalainen tuuli');
+    else if (brWx.windMax <= 12) parts.push('navakka tuuli');
+    else parts.push('kova tuuli');
+    if (brWx.pop <= 15) parts.push('poutainen');
+    else if (brWx.pop <= 40) parts.push('pilvipoutaa');
+    else parts.push('saderiski');
+    return parts.join(' · ');
+  }
+
+  // Render a single day summary strip inside a card
+  function renderDayStrip(wx, label, highlight) {
+    var si = symInfo(wx.sym);
+    var wd = windDirFi(wx.windDir);
+    var dateObj = dateFromKey(wx.key);
+    var dayName = WEEKDAYS_FI[dateObj.getDay()] + ' ' + dateObj.getDate() + '.' + (dateObj.getMonth() + 1) + '.';
+    var div = el('div', 'opt-day-strip' + (highlight ? ' opt-day-strip--highlight' : ''));
+    div.innerHTML =
+      '<div class="opt-day-label">' + label + '</div>' +
+      '<div class="opt-day-date">' + dayName + '</div>' +
+      '<div class="opt-day-icon">' + si.e + '</div>' +
+      '<div class="opt-day-desc">' + si.t + '</div>' +
+      '<div class="opt-day-temp">' + wx.tmax + '° <span class="opt-tmin">/ ' + wx.tmin + '°</span></div>' +
+      '<div class="opt-day-wind">💨 ' + (wd.arrow || '') + ' ' + wx.windMax + ' m/s</div>' +
+      '<div class="opt-day-rain">' + wx.pop + ' % sade</div>';
+    return div;
+  }
+
+  function buildOptionsUI(options, ts) {
+    var wrap = $('#optionsList');
+    wrap.innerHTML = '';
+
+    if (!options || !options.length) {
+      wrap.innerHTML = '<p class="muted">Ei sopivia vaihtoehtoja ennustejaksolla (Skiftet ei liikennöi ma tai la).</p>';
+      return;
+    }
+
+    options.forEach(function (opt, idx) {
+      var isBest = idx === 0;
+      var card = el('div', 'opt-card' + (isBest ? ' opt-card--best' : ''));
+
+      // Card header: direction + optional best badge
+      var dirIcon = opt.direction === 'cw' ? '⟳' : '⟲';
+      var dirName = opt.direction === 'cw' ? 'Myötäpäivään' : 'Vastapäivään';
+      var dirSub = opt.direction === 'cw'
+        ? 'Pv 1: Iniö · Pv 2: Brändö (Skiftet-päivä)'
+        : 'Pv 1: Brändö (Skiftet-päivä) · Pv 2: Iniö';
+      var badge = isBest ? '<span class="opt-best-badge">⭐ Suositus</span>' : '';
+
+      var head = el('div', 'opt-card__head');
+      head.innerHTML =
+        '<div class="opt-card__dir"><span class="opt-dir-icon">' + dirIcon + '</span>' +
+        '<div><div class="opt-dir-name">' + dirName + '</div>' +
+        '<div class="opt-dir-sub">' + dirSub + '</div></div></div>' + badge;
+      card.appendChild(head);
+
+      // Day strips
+      var body = el('div', 'opt-card__body');
+
+      // CW: D1=Iniö, D2=Brändö; CCW: D1=Brändö, D2=Iniö
+      if (opt.direction === 'cw') {
+        body.appendChild(renderDayStrip(opt.iniWx, 'Päivä 1 · Iniö', false));
+        body.appendChild(renderDayStrip(opt.brWx,  'Päivä 2 · Brändö ⚓', true));
+      } else {
+        body.appendChild(renderDayStrip(opt.brWx,  'Päivä 1 · Brändö ⚓', true));
+        body.appendChild(renderDayStrip(opt.iniWx, 'Päivä 2 · Iniö', false));
+      }
+
+      // Verdict line
+      var verdict = el('div', 'opt-verdict');
+      verdict.innerHTML = '<b>Brändö-päivä:</b> ' + brandoVerdict(opt.brWx);
+      body.appendChild(verdict);
+
+      card.appendChild(body);
+      wrap.appendChild(card);
+    });
+
+    if (ts) {
+      var dt = new Date(ts);
+      $('#optionsUpdated').textContent = 'Päivitetty ' + pad(dt.getHours()) + ':' + pad(dt.getMinutes()) +
+        ' · Ilmatieteen laitos' + (navigator.onLine ? '' : ' · offline');
+    }
+  }
+
+  // Build options from weather summaries for Brändö (ava) and Iniö (kannvik)
+  function computeOptions(wxData) {
+    // Find matching entries by name (weatherSpots uses place names)
+    var avaDot = null, kannvikDot = null;
+    wxData.forEach(function (item) {
+      if (!item.sum) return;
+      var n = item.name ? item.name.toLowerCase() : '';
+      // Brändö point = Åva
+      if (n.indexOf('åva') >= 0 || n.indexOf('ava') >= 0) avaDot = item.sum;
+      // Iniö point = Kannvik
+      if (n.indexOf('kannvik') >= 0) kannvikDot = item.sum;
+    });
+    // Fallback: use first two available
+    var avail = wxData.filter(function (d) { return d.sum; });
+    if (!avaDot && avail.length >= 1) avaDot = avail[0].sum;
+    if (!kannvikDot && avail.length >= 2) kannvikDot = avail[1].sum;
+    if (!avaDot || !kannvikDot) return [];
+
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var avaDays = avaDot.days.filter(function (d) {
+      return dateFromKey(d.key) >= today;
+    });
+    var kannvikDays = kannvikDot.days.filter(function (d) {
+      return dateFromKey(d.key) >= today;
+    });
+
+    // Build a lookup for Iniö days by key
+    var iniMap = {};
+    kannvikDays.forEach(function (d) { iniMap[d.key] = d; });
+    var brMap = {};
+    avaDays.forEach(function (d) { brMap[d.key] = d; });
+
+    var options = [];
+    // We need pairs of consecutive days. Use ava days as the time axis.
+    for (var i = 0; i < avaDays.length - 1; i++) {
+      var d1wx = avaDays[i];
+      var d2wx = avaDays[i + 1];
+      var d1 = dateFromKey(d1wx.key);
+      var d2 = dateFromKey(d2wx.key);
+
+      // Verify d2 is actually the next calendar day after d1
+      var gap = (d2.getTime() - d1.getTime()) / 86400000;
+      if (gap !== 1) continue;
+
+      // Get Iniö weather for matching keys
+      var iniD1 = iniMap[d1wx.key] || d1wx; // fallback to Åva if missing
+      var iniD2 = iniMap[d2wx.key] || d2wx;
+
+      // CW option: D1=Iniö, D2=Brändö. Skiftet must run on D2.
+      if (skiftetRunsOn(d2)) {
+        var brWxCW = d2wx; // Brändö/Åva on day 2
+        var iniWxCW = iniD1; // Iniö on day 1
+        options.push({
+          direction: 'cw',
+          d1key: d1wx.key,
+          d2key: d2wx.key,
+          brWx: brWxCW,
+          iniWx: iniWxCW,
+          score: scoreOption(brWxCW, iniWxCW)
+        });
+      }
+
+      // CCW option: D1=Brändö, D2=Iniö. Skiftet must run on D1.
+      if (skiftetRunsOn(d1)) {
+        var brWxCCW = d1wx; // Brändö/Åva on day 1
+        var iniWxCCW = iniD2; // Iniö on day 2
+        options.push({
+          direction: 'ccw',
+          d1key: d1wx.key,
+          d2key: d2wx.key,
+          brWx: brWxCCW,
+          iniWx: iniWxCCW,
+          score: scoreOption(brWxCCW, iniWxCCW)
+        });
+      }
+    }
+
+    options.sort(function (a, b) { return a.score - b.score; });
+    return options;
+  }
+
+  function ensureOptions(force) {
+    if (optLoading) return;
+    // Try cache first
+    var cached = null;
+    try { cached = JSON.parse(localStorage.getItem(OPT_KEY) || 'null'); } catch (e) {}
+
+    // We can reuse the main weather cache (WX_KEY) if present
+    var wxCached = null;
+    try { wxCached = JSON.parse(localStorage.getItem(WX_KEY) || 'null'); } catch (e) {}
+
+    if (cached && cached.options) {
+      buildOptionsUI(cached.options, cached.ts);
+      optLoaded = true;
+    } else if (wxCached && wxCached.data) {
+      // Build options from existing weather cache without re-fetching
+      var opts = computeOptions(wxCached.data);
+      buildOptionsUI(opts, wxCached.ts);
+      optLoaded = true;
+      try { localStorage.setItem(OPT_KEY, JSON.stringify({ ts: wxCached.ts, options: opts })); } catch (e) {}
+    }
+
+    if (!force && optLoaded && navigator.onLine === false) return;
+    if (!navigator.onLine) {
+      if (!optLoaded) {
+        $('#optionsList').innerHTML = '<p class="muted">Lataa sää ensin verkkoyhteyden kanssa — vaihtoehdot lasketaan ennusteesta.</p>';
+      }
+      return;
+    }
+    fetchOptionsWeather();
+  }
+
+  function fetchOptionsWeather() {
+    optLoading = true;
+    $('#optionsUpdated').textContent = 'Päivitetään (Ilmatieteen laitos)…';
+    var spots = weatherSpots();
+    if (!spots.length) {
+      optLoading = false;
+      $('#optionsList').innerHTML = '<p class="muted">Ei sääpisteitä määritelty.</p>';
+      return;
+    }
+    Promise.all(spots.map(function (s) {
+      return fetch(fmiUrl(s.lat, s.lon, 9))
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(function (xml) { return { name: s.name, sum: summarizeFmi(parseFmiTVP(xml)) }; })
+        .catch(function (e) { console.warn('FMI options fetch failed', s.name, e); return { name: s.name, sum: null }; });
+    })).then(function (results) {
+      var ts = Date.now();
+      var opts = computeOptions(results);
+      var ok = results.some(function (r) { return r.sum; });
+      if (ok) {
+        try { localStorage.setItem(OPT_KEY, JSON.stringify({ ts: ts, options: opts })); } catch (e) {}
+        // Also refresh the main weather cache
+        try { localStorage.setItem(WX_KEY, JSON.stringify({ ts: ts, data: results })); } catch (e) {}
+      }
+      buildOptionsUI(opts, ts);
+      optLoaded = optLoaded || ok;
+      optLoading = false;
+      if (!ok) $('#optionsUpdated').textContent = 'Sään haku epäonnistui.';
+    });
+  }
+
+  $('#refreshOptions').addEventListener('click', function () { ensureOptions(true); });
 
   /* ---------- RAIN RADAR (FMI WMS, animated) ---------- */
   var radar = { on: false, layer: null, frames: [], idx: 0, timer: null, playing: true };
