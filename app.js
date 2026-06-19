@@ -6,8 +6,6 @@
 
   /* ---------- Service worker ---------- */
   if ('serviceWorker' in navigator) {
-    // Auto-refresh once when a new service worker takes over, so a redeploy
-    // never leaves a stale page. (Skip on first-ever install — no controller yet.)
     var hadController = !!navigator.serviceWorker.controller;
     var refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', function () {
@@ -17,7 +15,7 @@
     });
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('sw.js').then(function (reg) {
-        reg.update(); // check for a newer SW on every load
+        reg.update();
       }).catch(function (e) { console.warn('SW registration failed', e); });
     });
   }
@@ -42,6 +40,7 @@
   function fmtDateLongFi(d) { return WEEKDAYS_FI_LONG[d.getDay()] + ' ' + d.getDate() + '. ' + MONTHS_FI[d.getMonth() + 1] + 'kuuta'; }
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
   function minutesOf(hhmm) { var p = hhmm.split(':'); return (+p[0]) * 60 + (+p[1]); }
+  function hhmm(totalMin) { var h = Math.floor(totalMin / 60) % 24; var m = totalMin % 60; return pad(h) + ':' + pad(m); }
 
   /* E-bike pace */
   var EBIKE_KMH = (T.meta && T.meta.ebikeKmh) || 20;
@@ -53,18 +52,15 @@
     return h + ' h' + (m ? ' ' + m + ' min' : '');
   }
 
-  /* Does a free-text "days valid" string apply on the given JS date? Best-effort. */
   function runsOnDay(daysText, date) {
     if (!daysText) return true;
     var s = daysText.toLowerCase();
     if (/(päivit|joka päivä|daily|dagligen|ma\s*[-–]\s*su|ma\s*[-–]\s*sun|mon\s*[-–]\s*sun)/.test(s)) return true;
-    var dow = date.getDay(); // 0 Su .. 6 Sa
-    // explicit single-token weekday hints
+    var dow = date.getDay();
     var tokens = [
       [1, ['ma', 'mon', 'måndag']], [2, ['ti', 'tue', 'tisdag']], [3, ['ke', 'wed', 'onsdag']],
       [4, ['to', 'thu', 'torsdag']], [5, ['pe', 'fri', 'fredag']], [6, ['la', 'sat', 'lördag']], [0, ['su', 'sun', 'söndag']]
     ];
-    // range "Ma–Pe" style: if it mentions a range, approximate weekdays
     if (/ma\s*[-–]\s*pe|mon\s*[-–]\s*fri/.test(s)) return dow >= 1 && dow <= 5;
     if (/pe\s*[-–]\s*su|fri\s*[-–]\s*sun/.test(s)) return dow === 5 || dow === 6 || dow === 0;
     if (/la\s*[-–]\s*su|sat\s*[-–]\s*sun|viikonlopp/.test(s)) return dow === 6 || dow === 0;
@@ -75,9 +71,8 @@
         if (re.test(s)) { any = true; if (t[0] === dow) matched = true; }
       });
     });
-    return any ? matched : true; // if we can't parse, assume it runs
+    return any ? matched : true;
   }
-  /* Prefer explicit dow array (0=Sun..6=Sat) when present; else parse the label. */
   function scheduleRuns(s, date) {
     if (s && Array.isArray(s.dow)) return s.dow.indexOf(date.getDay()) >= 0;
     return runsOnDay(s ? s.days : '', date);
@@ -86,10 +81,166 @@
   function windDirFi(deg) {
     if (deg == null) return '';
     var dirs = ['pohjoisesta', 'koillisesta', 'idästä', 'kaakosta', 'etelästä', 'lounaasta', 'lännestä', 'luoteesta'];
-    var arrows = ['↓', '↙', '←', '↖', '↑', '↗', '→', '↘']; // arrow points where wind goes
+    var arrows = ['↓', '↙', '←', '↖', '↑', '↗', '→', '↘'];
     var i = Math.round(deg / 45) % 8;
     return { label: dirs[i], arrow: arrows[i] };
   }
+
+  /* ---------- Canonical legs (clockwise order from data.js) ---------- */
+  var CANON_LEGS = (T.legs || []).map(function (l) { return Object.assign({}, l); });
+
+  /* ---------- Generate legs for a given direction ---------- */
+  function generateLegs(dir) {
+    var legs;
+    if (dir === 'cw') {
+      legs = CANON_LEGS.map(function (l) { return Object.assign({}, l); });
+    } else {
+      // CCW: reverse and swap from/to
+      legs = CANON_LEGS.slice().reverse().map(function (l) {
+        return Object.assign({}, l, { from: l.to, to: l.from });
+      });
+    }
+    // Assign day tags: day=1 up to and including the leg whose to==='nasby', day=2 after
+    var passedNasby = false;
+    // In CW the overnight is at nasby (to===nasby). In CCW reversed legs, from===nasby is the start of day 2.
+    // Strategy: for cw, leg.to==='nasby' is end of day 1.
+    //           for ccw, reversed list: the overnight split is the same place; find the leg where original.to==='nasby'
+    //           which after reversal becomes leg.from==='nasby'.
+    legs.forEach(function (leg) {
+      if (!passedNasby) {
+        leg.day = 1;
+        // CW: we're done with day1 after delivering TO nasby
+        if (dir === 'cw' && leg.to === 'nasby') passedNasby = true;
+        // CCW: reversed — the leg that departs FROM nasby is the first leg of day 2
+        if (dir === 'ccw' && leg.from === 'nasby') { leg.day = 2; passedNasby = true; }
+      } else {
+        leg.day = 2;
+      }
+    });
+    return legs;
+  }
+
+  /* ---------- Generate day plan ---------- */
+  function generateDayPlan(dir, d1key, d2key) {
+    var legs = T.legs; // already set by generateLegs call before this
+    var d1 = isoToDate(d1key);
+    var d2 = isoToDate(d2key);
+
+    function schedulerForDay(dayNum, date) {
+      var dayLegs = legs.filter(function (l) { return l.day === dayNum; });
+      var currentMin = 9 * 60; // 09:00
+      var rows = [];
+
+      dayLegs.forEach(function (leg) {
+        var a = place(leg.from), b = place(leg.to);
+        var fromName = a.name || leg.from;
+        var toName = b.name || leg.to;
+
+        if (leg.mode === 'bike') {
+          var depart = currentMin;
+          var ride = rideMin(leg.km || 0);
+          var arrive = depart + ride;
+          var txt = '🚲 ' + fromName + ' → ' + toName + ' ~' + (leg.km || 0) + ' km (~' + fmtDur(ride) + ')';
+          rows.push({ t: hhmm(depart), text: txt });
+          currentMin = arrive;
+          // 15-min break if ride >= 40 km
+          if ((leg.km || 0) >= 40) currentMin += 15;
+
+        } else if (leg.mode === 'ferry') {
+          var ferryId = leg.ferry;
+          var fobj = (T.ferries || {})[ferryId];
+          var ferryName = fobj ? fobj.name : ferryId;
+          var crossMin = (fobj && fobj.crossingMin) ? fobj.crossingMin : 30;
+          var bookingStr = (fobj && fobj.booking === 'yes') ? ' (varaa)' : '';
+
+          // On-demand ferry: times empty
+          var allTimes = [];
+          var matchedEntry = null;
+          if (fobj && fobj.schedules) {
+            fobj.schedules.forEach(function (s) {
+              // Match by from/to if available, else direction-agnostic (skagen_jumo)
+              var fromToMatch = (!s.from && !s.to) ||
+                (s.from === leg.from && s.to === leg.to);
+              if (fromToMatch && scheduleRuns(s, date)) {
+                if ((s.times || []).length === 0) {
+                  // on-demand
+                  matchedEntry = s;
+                } else {
+                  matchedEntry = matchedEntry || s;
+                  allTimes = allTimes.concat(s.times || []);
+                }
+              }
+            });
+          }
+
+          if (!fobj || !fobj.schedules || fobj.schedules.length === 0) {
+            // No ferry info at all
+            rows.push({ t: hhmm(currentMin), text: '⛴ ' + fromName + ' → ' + toName + bookingStr + ' — ei aikataulutietoja, tarkista' });
+            currentMin += crossMin;
+          } else if (matchedEntry && allTimes.length === 0) {
+            // On-demand (e.g. skagen_jumo)
+            var arriveOnDemand = currentMin + crossMin;
+            rows.push({ t: hhmm(currentMin), text: '⛴ ' + ferryName + ' ' + fromName + ' → ' + toName + bookingStr + ' → ' + hhmm(arriveOnDemand) + ' (tarvittaessa)' });
+            currentMin = arriveOnDemand;
+          } else if (allTimes.length > 0) {
+            // Pick earliest time >= currentMin
+            var sortedTimes = allTimes.slice().sort(function (a, b) { return minutesOf(a) - minutesOf(b); });
+            var chosenTime = null;
+            var late = false;
+            for (var i = 0; i < sortedTimes.length; i++) {
+              if (minutesOf(sortedTimes[i]) >= currentMin) { chosenTime = sortedTimes[i]; break; }
+            }
+            if (!chosenTime) {
+              // No time >= currentMin, take last (flag late)
+              chosenTime = sortedTimes[sortedTimes.length - 1];
+              late = true;
+            }
+            var departMin = minutesOf(chosenTime);
+            var arriveMin = departMin + crossMin;
+            var lateNote = late ? ' ⚠️ myöhässä — tarkista' : '';
+            rows.push({ t: hhmm(departMin), text: '⛴ ' + ferryName + ' ' + fromName + ' → ' + toName + bookingStr + ' → ' + hhmm(arriveMin) + lateNote });
+            currentMin = arriveMin;
+          } else {
+            // matchedEntry found but no times and not on-demand: no service this day
+            rows.push({ t: hhmm(currentMin), text: '⛴ ' + ferryName + ' ' + fromName + ' → ' + toName + ' — ei vuoroa tänä päivänä, tarkista' });
+          }
+        }
+      });
+
+      return rows;
+    }
+
+    // Day 1 title
+    var title1 = dir === 'cw'
+      ? 'Kustavi → Iniö → Houtskär'
+      : 'Kustavi → Brändö → Houtskär ⚓';
+    // Day 2 title
+    var title2 = dir === 'cw'
+      ? 'Houtskär → Brändö → Kustavi ⚓'
+      : 'Houtskär → Iniö → Kustavi';
+
+    var rows1 = schedulerForDay(1, d1);
+    // Prepend drive note
+    rows1.unshift({ t: 'aamu', text: 'Aja autolla Kustaviin (Peterzens), pura pyörät.' });
+
+    var rows2 = schedulerForDay(2, d2);
+
+    T.dayPlan = [
+      {
+        day: 1, date: d1key, title: title1,
+        rows: rows1,
+        overnight: 'Restaurang Sybarit B&B (Houtskär) — yö 1'
+      },
+      {
+        day: 2, date: d2key, title: title2,
+        rows: rows2,
+        overnight: 'Peterzens Boathouse (Kustavi) — yö 2'
+      }
+    ];
+  }
+
+  /* ---------- Module-level selected option ---------- */
+  var SELECTED = null;
 
   /* ---------- Tab navigation ---------- */
   var mapInited = false;
@@ -136,18 +287,15 @@
     return L.divIcon({ className: '', html: '<div class="dist-label dist-label--' + mode + '">' + txt + '</div>', iconSize: [1, 1] });
   }
 
-  function initMap() {
-    mapInited = true;
-    var map = L.map('map', { zoomControl: true, attributionControl: true });
-    window._map = map;
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 18, crossOrigin: true, attribution: '© OpenStreetMap'
-    }).addTo(map);
+  var routeLayer = null;
 
+  function drawRoute() {
+    if (!window._map || !routeLayer) return;
+    routeLayer.clearLayers();
+    var map = window._map;
     var bounds = [];
     var legs = T.legs || [];
 
-    // Draw legs as polylines + distance labels
     legs.forEach(function (leg) {
       var a = place(leg.from), b = place(leg.to);
       if (!hasCoord(a) || !hasCoord(b)) return;
@@ -159,16 +307,10 @@
           (ROUTE_GEOM[leg.to + '>' + leg.from] ? ROUTE_GEOM[leg.to + '>' + leg.from].slice().reverse() : null)
         );
         if (geom && geom.length >= 2) {
-          L.polyline(geom, {
-            color: '#e8590c',
-            weight: 5,
-            opacity: 0.9,
-            dashArray: null,
-            lineCap: 'round'
-          }).addTo(map);
+          L.polyline(geom, { color: '#e8590c', weight: 5, opacity: 0.9, dashArray: null, lineCap: 'round' }).addTo(routeLayer);
           geom.forEach(function (pt) { bounds.push(pt); });
           var midPt = geom[Math.floor(geom.length / 2)];
-          L.marker(midPt, { icon: distLabel('bike', txt), interactive: false, keyboard: false }).addTo(map);
+          L.marker(midPt, { icon: distLabel('bike', txt), interactive: false, keyboard: false }).addTo(routeLayer);
           return;
         }
       }
@@ -180,39 +322,37 @@
         opacity: 0.9,
         dashArray: ferry ? '2,10' : null,
         lineCap: 'round'
-      }).addTo(map);
+      }).addTo(routeLayer);
       var mid = [(a.lat + b.lat) / 2, (a.lon + b.lon) / 2];
-      L.marker(mid, { icon: distLabel(ferry ? 'ferry' : 'bike', txt), interactive: false, keyboard: false }).addTo(map);
+      L.marker(mid, { icon: distLabel(ferry ? 'ferry' : 'bike', txt), interactive: false, keyboard: false }).addTo(routeLayer);
     });
 
-    // Optional spurs (side trips), dashed grey
     (T.spurs || []).forEach(function (sp) {
       var a = place(sp.from), b = place(sp.to);
       if (!hasCoord(a) || !hasCoord(b)) return;
-      L.polyline([[a.lat, a.lon], [b.lat, b.lon]], { color: '#868e96', weight: 3, opacity: .7, dashArray: '4,7' }).addTo(map);
+      L.polyline([[a.lat, a.lon], [b.lat, b.lon]], { color: '#868e96', weight: 3, opacity: .7, dashArray: '4,7' }).addTo(routeLayer);
       bounds.push([b.lat, b.lon]);
     });
 
-    // Markers
+    // Re-add place markers and accommodations to routeLayer
     Object.keys(P).forEach(function (key) {
       var p = P[key];
       if (!hasCoord(p)) return;
-      if (p.type === 'accommodation') return; // drawn separately as lodging markers
+      if (p.type === 'accommodation') return;
       var cls = 'pin--town', label = '';
       if (p.type === 'ferryTerminal') { cls = 'pin--ferry'; label = '⛴'; }
       else if (p.type === 'side' || p.type === 'sidetrip') cls = 'pin--side';
       else if (p.type === 'town' || p.type === 'village') cls = 'pin--town';
-      var m = L.marker([p.lat, p.lon], { icon: pinIcon(cls, label), title: p.name }).addTo(map);
+      var m = L.marker([p.lat, p.lon], { icon: pinIcon(cls, label), title: p.name }).addTo(routeLayer);
       m.bindPopup(placePopup(key, p));
       bounds.push([p.lat, p.lon]);
     });
 
-    // Accommodations (special markers)
     (T.accommodations || []).forEach(function (ac) {
       var lat = ac.lat, lon = ac.lon;
       if (lat == null && ac.place && hasCoord(place(ac.place))) { lat = place(ac.place).lat; lon = place(ac.place).lon; }
       if (lat == null) return;
-      var m = L.marker([lat, lon], { icon: pinIcon('pin--lodging', '🛏') , title: ac.name, zIndexOffset: 1000 }).addTo(map);
+      var m = L.marker([lat, lon], { icon: pinIcon('pin--lodging', '🛏'), title: ac.name, zIndexOffset: 1000 }).addTo(routeLayer);
       m.bindPopup('<b>🛏 Yö ' + ac.night + ': ' + ac.name + '</b><br><span class="popup-sub">' + (ac.address || '') + '</span>' +
         (ac.link ? '<br><a href="' + ac.link + '" target="_blank" rel="noopener">Lisätietoja ›</a>' : ''));
       bounds.push([lat, lon]);
@@ -223,8 +363,26 @@
       else map.setView([60.35, 21.2], 9);
     }
     doFit();
+    // Ensure size is correct after potential layout shift
+    setTimeout(function () { map.invalidateSize(); doFit(); }, 120);
+    setTimeout(function () { map.invalidateSize(); doFit(); }, 500);
 
-    $('#fitBtn').addEventListener('click', doFit);
+    // Expose doFit for fitBtn (wired in initMap, but update closure reference via window)
+    window._doFit = doFit;
+  }
+
+  function initMap() {
+    mapInited = true;
+    var map = L.map('map', { zoomControl: true, attributionControl: true });
+    window._map = map;
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18, crossOrigin: true, attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    routeLayer = L.layerGroup().addTo(map);
+    drawRoute();
+
+    $('#fitBtn').addEventListener('click', function () { if (window._doFit) window._doFit(); });
     setupRadar(map);
     $('#locateBtn').addEventListener('click', function () {
       map.locate({ setView: true, maxZoom: 13 });
@@ -234,13 +392,9 @@
         .addTo(map).bindPopup('Olet tässä').openPopup();
     });
     map.on('locationerror', function () { alert('Sijaintia ei saatu. Salli paikannus selaimen asetuksista.'); });
-    // Layout may not be ready when initMap runs at load → recompute size and re-fit.
-    setTimeout(function () { map.invalidateSize(); doFit(); }, 120);
-    setTimeout(function () { map.invalidateSize(); doFit(); }, 500);
   }
 
   function placePopup(key, p) {
-    // find onward leg from this place
     var onward = (T.legs || []).filter(function (l) { return l.from === key; })[0];
     var html = '<b>' + p.name + '</b>';
     if (p.island) html += ' <span class="popup-sub">' + p.island + '</span>';
@@ -338,9 +492,29 @@
     });
   }
 
+  /* Set the ferry day filter to the ISO date key of the trip day's date */
+  function setFerryFilterToDate(dateKey) {
+    var sel = $('#ferryDay');
+    if (!sel) return;
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var target = isoToDate(dateKey);
+    var diff = Math.round((target.getTime() - today.getTime()) / 86400000);
+    if (diff >= 0 && diff <= 8) {
+      sel.value = diff;
+      selectedFerryDate = target;
+    }
+  }
+
   function scrollToFerry(id) {
     var node = document.getElementById('ferry-' + id);
     if (node) node.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /* Compute which ferry ids are used on each trip day */
+  function getTripDayFerryIds(dayNum) {
+    return (T.legs || [])
+      .filter(function (l) { return l.day === dayNum && l.mode === 'ferry' && l.ferry; })
+      .map(function (l) { return l.ferry; });
   }
 
   function buildFerries() {
@@ -351,7 +525,17 @@
     var isToday = (new Date()).toDateString() === refDate.toDateString();
     var nowMin = (new Date()).getHours() * 60 + (new Date()).getMinutes();
 
-    // order ferries by their appearance in legs
+    // Determine which trip day matches refDate (for highlight)
+    var tripDay1FerryIds = [], tripDay2FerryIds = [];
+    var tripHighlightFerryIds = [];
+    if (SELECTED) {
+      tripDay1FerryIds = getTripDayFerryIds(1);
+      tripDay2FerryIds = getTripDayFerryIds(2);
+      var refKey = new Intl.DateTimeFormat('sv-SE').format(refDate);
+      if (refKey === SELECTED.d1key) tripHighlightFerryIds = tripDay1FerryIds;
+      else if (refKey === SELECTED.d2key) tripHighlightFerryIds = tripDay2FerryIds;
+    }
+
     var order = [];
     (T.legs || []).forEach(function (l) { if (l.ferry && order.indexOf(l.ferry) < 0) order.push(l.ferry); });
     Object.keys(ferries).forEach(function (k) { if (order.indexOf(k) < 0) order.push(k); });
@@ -359,21 +543,24 @@
     order.forEach(function (id) {
       var f = ferries[id];
       if (!f) return;
-      var card = el('div', 'ferry-card');
+      var isTripFerry = tripHighlightFerryIds.indexOf(id) >= 0;
+      var card = el('div', 'ferry-card' + (isTripFerry ? ' ferry-card--trip' : ''));
       card.id = 'ferry-' + id;
+
       var bookBadge = '';
       if (f.booking === 'yes') bookBadge = '<span class="badge badge--book">Varaus pakollinen</span>';
       else if (f.booking === 'recommended') bookBadge = '<span class="badge badge--book">Varaus suositeltu</span>';
       var freeBadge = f.price && /free|ilmai/i.test(f.price) ? '<span class="badge badge--free">Maksuton</span>' : '';
+
+      var tripBadge = isTripFerry ? '<span class="badge badge--trip">Tämän päivän yhteys</span>' : '';
 
       card.appendChild(el('div', 'ferry-card__head',
         '<span class="icon">⛴️</span><div><h3>' + f.name + '</h3><div class="op">' + (f.operator || '') +
         (f.crossingMin ? ' · ylitys n. ' + f.crossingMin + ' min' : '') + '</div></div>'));
 
       var body = el('div', 'ferry-card__body');
-      if (bookBadge || freeBadge) body.appendChild(el('div', '', bookBadge + ' ' + freeBadge));
+      if (bookBadge || freeBadge || tripBadge) body.appendChild(el('div', '', bookBadge + ' ' + freeBadge + ' ' + tripBadge));
 
-      // compute next departure across schedules valid on refDate
       var nextInfo = null;
       (f.schedules || []).forEach(function (s) {
         if (!scheduleRuns(s, refDate)) return;
@@ -419,11 +606,10 @@
     });
   }
 
-  /* ---------- WEATHER VIEW (FMI open data) ---------- */
+  /* ---------- WEATHER VIEW ---------- */
   var WX_KEY = 'skiftet_wx_fmi_v1';
   var wxLoaded = false, wxLoading = false;
 
-  // FMI SmartSymbol -> { e: emoji, t: finnish }. Night codes = day + 100 (fallback handles the rest).
   var SMART = {
     1: { e: '☀️', t: 'Selkeää' }, 2: { e: '🌤️', t: 'Enimmäkseen selkeää' },
     4: { e: '⛅', t: 'Puolipilvistä' }, 6: { e: '🌥️', t: 'Enimmäkseen pilvistä' },
@@ -458,7 +644,6 @@
     }).filter(function (s) { return typeof s.lat === 'number'; });
   }
 
-  /* FMI WFS forecast */
   var FMI_PARAMS = ['Temperature', 'WindSpeedMS', 'WindDirection', 'Precipitation1h', 'SmartSymbol', 'PoP'];
   var NS_WML2 = 'http://www.opengis.net/waterml/2.0', NS_GML = 'http://www.opengis.net/gml/3.2';
   function fmiIso(d) { return d.toISOString().replace(/\.\d{3}Z$/, 'Z'); }
@@ -502,13 +687,11 @@
     var times = (parsed.Temperature || []).map(function (x) { return x.t; });
     var mT = toMap(parsed.Temperature), mW = toMap(parsed.WindSpeedMS), mWD = toMap(parsed.WindDirection),
       mP = toMap(parsed.Precipitation1h), mS = toMap(parsed.SmartSymbol), mPOP = toMap(parsed.PoP);
-    // current = first hour at/after now-1h
     var nowMs = Date.now(), cur = null;
     for (var i = 0; i < times.length; i++) {
       if (new Date(times[i]).getTime() >= nowMs - 3600000) { var ct = times[i]; cur = { temp: mT[ct], wind: mW[ct], dir: mWD[ct], precip: mP[ct], sym: mS[ct], pop: mPOP[ct] }; break; }
     }
     if (!cur && times.length) { var t0 = times[0]; cur = { temp: mT[t0], wind: mW[t0], dir: mWD[t0], precip: mP[t0], sym: mS[t0], pop: mPOP[t0] }; }
-    // daily aggregation (local days)
     var days = {}, order = [];
     times.forEach(function (ts) {
       var k = dayKeyHelsinki(ts);
@@ -532,7 +715,6 @@
     if (wxLoading) return;
     var spots = weatherSpots();
     if (!spots.length) { $('#weatherList').innerHTML = '<p class="muted">Ei sääpisteitä määritelty.</p>'; return; }
-    // render from cache first
     var cached = null;
     try { cached = JSON.parse(localStorage.getItem(WX_KEY) || 'null'); } catch (e) {}
     if (cached && cached.data) { renderWeather(cached.data, cached.ts); wxLoaded = true; }
@@ -608,35 +790,29 @@
     }
   }
 
+  /* Re-render weather from cache with current trip highlight (called by applyOption) */
+  function renderWeatherFromCache() {
+    var cached = null;
+    try { cached = JSON.parse(localStorage.getItem(WX_KEY) || 'null'); } catch (e) {}
+    if (cached && cached.data) renderWeather(cached.data, cached.ts);
+  }
+
   $('#refreshWeather').addEventListener('click', function () { ensureWeather(true); });
 
-  /* ---------- OPTIONS VIEW (2-day loop comparison, ranked by weather) ---------- */
+  /* ---------- OPTIONS VIEW ---------- */
   var OPT_KEY = 'skiftet_opts_v1';
+  var SEL_KEY = 'skiftet_sel_v1';
   var optLoaded = false, optLoading = false;
 
-  // Skiftet runs only on days NOT in this list (0=Su,1=Mo,2=Tu,...,6=Sa)
-  // data.js: dow: [0, 2, 3, 4, 5]  → does NOT run Mon(1) or Sat(6)
-  var SKIFTET_NO_RUN_DOW = [1, 6]; // Monday, Saturday
-
-  function skiftetRunsOn(date) {
-    var dow = date.getDay();
-    return SKIFTET_NO_RUN_DOW.indexOf(dow) < 0;
-  }
-
-  // dateFromKey('2026-06-22') → Date at local midnight
+  var SKIFTET_NO_RUN_DOW = [1, 6];
+  function skiftetRunsOn(date) { return SKIFTET_NO_RUN_DOW.indexOf(date.getDay()) < 0; }
   function dateFromKey(k) { var p = k.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
 
-  // Score: lower = better. Heavily weights the Brändö/Åva day (the exposed crossing day).
   function scoreOption(brWx, iniWx) {
-    return brWx.pop * 1.0
-      + brWx.precip * 15
-      + brWx.windMax * 1.5
-      + iniWx.pop * 0.4
-      + iniWx.precip * 5
-      - brWx.tmax * 0.4;
+    return brWx.pop * 1.0 + brWx.precip * 15 + brWx.windMax * 1.5
+      + iniWx.pop * 0.4 + iniWx.precip * 5 - brWx.tmax * 0.4;
   }
 
-  // Short verdict sentence for the Brändö day
   function brandoVerdict(brWx) {
     var parts = [];
     var si = symInfo(brWx.sym);
@@ -651,7 +827,6 @@
     return parts.join(' · ');
   }
 
-  // Render a single day summary strip inside a card
   function renderDayStrip(wx, label, highlight) {
     var si = symInfo(wx.sym);
     var wd = windDirFi(wx.windDir);
@@ -669,6 +844,60 @@
     return div;
   }
 
+  /* ---------- applyOption ---------- */
+  function applyOption(opt, noNav) {
+    var dir = opt.direction; // 'cw' or 'ccw'
+    SELECTED = opt;
+
+    // Update TRIP meta
+    T.meta.direction = dir === 'cw' ? 'Myötäpäivään' : 'Vastapäivään';
+    T.meta.tripStart = opt.d1key;
+    T.meta.tripEnd = opt.d2key;
+
+    // Regenerate legs and day plan
+    T.legs = generateLegs(dir);
+    generateDayPlan(dir, opt.d1key, opt.d2key);
+
+    // Persist selection
+    try { localStorage.setItem(SEL_KEY, JSON.stringify({ direction: dir, d1key: opt.d1key, d2key: opt.d2key })); } catch (e) {}
+
+    // Update header subtitle and route title
+    var sub = document.querySelector('.app-header__sub');
+    if (sub) sub.textContent = 'Kustavi · Brändö · Houtskär · Iniö — ' + T.meta.direction.toLowerCase();
+    var rt = document.getElementById('routeTitle');
+    if (rt) rt.textContent = 'Reitti vaiheittain (' + T.meta.direction.toLowerCase() + ')';
+
+    // Re-render route view
+    buildRoute();
+
+    // Redraw map if already open
+    if (window._map && routeLayer) drawRoute();
+
+    // Re-highlight weather from cache
+    renderWeatherFromCache();
+
+    // Set ferry filter to day 1 first, then rebuild so the trip-day highlight matches
+    setFerryFilterToDate(opt.d1key);
+    buildFerries();
+
+    // Mark selected option card
+    document.querySelectorAll('.opt-card').forEach(function (c) { c.classList.remove('opt-card--selected'); });
+    document.querySelectorAll('.opt-choose').forEach(function (btn) {
+      btn.textContent = 'Valitse tämä';
+      btn.disabled = false;
+    });
+    // Find matching card by data attribute
+    var selCard = document.querySelector('.opt-card[data-d1key="' + opt.d1key + '"][data-dir="' + dir + '"]');
+    if (selCard) {
+      selCard.classList.add('opt-card--selected');
+      var btn = selCard.querySelector('.opt-choose');
+      if (btn) { btn.textContent = 'Valittu ✓'; btn.disabled = true; }
+    }
+
+    // Navigate to route view (unless noNav)
+    if (!noNav) showView('route');
+  }
+
   function buildOptionsUI(options, ts) {
     var wrap = $('#optionsList');
     wrap.innerHTML = '';
@@ -680,9 +909,13 @@
 
     options.forEach(function (opt, idx) {
       var isBest = idx === 0;
-      var card = el('div', 'opt-card' + (isBest ? ' opt-card--best' : ''));
+      var isSelected = SELECTED && SELECTED.direction === opt.direction &&
+        SELECTED.d1key === opt.d1key && SELECTED.d2key === opt.d2key;
+      var cardCls = 'opt-card' + (isBest ? ' opt-card--best' : '') + (isSelected ? ' opt-card--selected' : '');
+      var card = el('div', cardCls);
+      card.setAttribute('data-dir', opt.direction);
+      card.setAttribute('data-d1key', opt.d1key);
 
-      // Card header: direction + optional best badge
       var dirIcon = opt.direction === 'cw' ? '⟳' : '⟲';
       var dirName = opt.direction === 'cw' ? 'Myötäpäivään' : 'Vastapäivään';
       var dirSub = opt.direction === 'cw'
@@ -697,10 +930,8 @@
         '<div class="opt-dir-sub">' + dirSub + '</div></div></div>' + badge;
       card.appendChild(head);
 
-      // Day strips
       var body = el('div', 'opt-card__body');
 
-      // CW: D1=Iniö, D2=Brändö; CCW: D1=Brändö, D2=Iniö
       if (opt.direction === 'cw') {
         body.appendChild(renderDayStrip(opt.iniWx, 'Päivä 1 · Iniö', false));
         body.appendChild(renderDayStrip(opt.brWx,  'Päivä 2 · Brändö ⚓', true));
@@ -709,10 +940,18 @@
         body.appendChild(renderDayStrip(opt.iniWx, 'Päivä 2 · Iniö', false));
       }
 
-      // Verdict line
       var verdict = el('div', 'opt-verdict');
       verdict.innerHTML = '<b>Brändö-päivä:</b> ' + brandoVerdict(opt.brWx);
       body.appendChild(verdict);
+
+      // "Valitse" button
+      var chooseBtnText = isSelected ? 'Valittu ✓' : 'Valitse tämä';
+      var chooseBtn = el('button', 'opt-choose pill-btn', chooseBtnText);
+      if (isSelected) chooseBtn.disabled = true;
+      (function (capturedOpt) {
+        chooseBtn.addEventListener('click', function () { applyOption(capturedOpt, false); });
+      }(opt));
+      body.appendChild(chooseBtn);
 
       card.appendChild(body);
       wrap.appendChild(card);
@@ -725,79 +964,52 @@
     }
   }
 
-  // Build options from weather summaries for Brändö (ava) and Iniö (kannvik)
   function computeOptions(wxData) {
-    // Find matching entries by name (weatherSpots uses place names)
     var avaDot = null, kannvikDot = null;
     wxData.forEach(function (item) {
       if (!item.sum) return;
       var n = item.name ? item.name.toLowerCase() : '';
-      // Brändö point = Åva
       if (n.indexOf('åva') >= 0 || n.indexOf('ava') >= 0) avaDot = item.sum;
-      // Iniö point = Kannvik
       if (n.indexOf('kannvik') >= 0) kannvikDot = item.sum;
     });
-    // Fallback: use first two available
     var avail = wxData.filter(function (d) { return d.sum; });
     if (!avaDot && avail.length >= 1) avaDot = avail[0].sum;
     if (!kannvikDot && avail.length >= 2) kannvikDot = avail[1].sum;
     if (!avaDot || !kannvikDot) return [];
 
     var today = new Date(); today.setHours(0, 0, 0, 0);
-    var avaDays = avaDot.days.filter(function (d) {
-      return dateFromKey(d.key) >= today;
-    });
-    var kannvikDays = kannvikDot.days.filter(function (d) {
-      return dateFromKey(d.key) >= today;
-    });
+    var avaDays = avaDot.days.filter(function (d) { return dateFromKey(d.key) >= today; });
+    var kannvikDays = kannvikDot.days.filter(function (d) { return dateFromKey(d.key) >= today; });
 
-    // Build a lookup for Iniö days by key
     var iniMap = {};
     kannvikDays.forEach(function (d) { iniMap[d.key] = d; });
-    var brMap = {};
-    avaDays.forEach(function (d) { brMap[d.key] = d; });
 
     var options = [];
-    // We need pairs of consecutive days. Use ava days as the time axis.
     for (var i = 0; i < avaDays.length - 1; i++) {
       var d1wx = avaDays[i];
       var d2wx = avaDays[i + 1];
       var d1 = dateFromKey(d1wx.key);
       var d2 = dateFromKey(d2wx.key);
-
-      // Verify d2 is actually the next calendar day after d1
       var gap = (d2.getTime() - d1.getTime()) / 86400000;
       if (gap !== 1) continue;
 
-      // Get Iniö weather for matching keys
-      var iniD1 = iniMap[d1wx.key] || d1wx; // fallback to Åva if missing
+      var iniD1 = iniMap[d1wx.key] || d1wx;
       var iniD2 = iniMap[d2wx.key] || d2wx;
 
-      // CW option: D1=Iniö, D2=Brändö. Skiftet must run on D2.
+      // CW: D1=Iniö, D2=Brändö. Skiftet runs D2.
       if (skiftetRunsOn(d2)) {
-        var brWxCW = d2wx; // Brändö/Åva on day 2
-        var iniWxCW = iniD1; // Iniö on day 1
         options.push({
-          direction: 'cw',
-          d1key: d1wx.key,
-          d2key: d2wx.key,
-          brWx: brWxCW,
-          iniWx: iniWxCW,
-          score: scoreOption(brWxCW, iniWxCW)
+          direction: 'cw', d1key: d1wx.key, d2key: d2wx.key,
+          brWx: d2wx, iniWx: iniD1,
+          score: scoreOption(d2wx, iniD1)
         });
       }
-
-      // CCW option: D1=Brändö, D2=Iniö. Skiftet must run on D1.
+      // CCW: D1=Brändö, D2=Iniö. Skiftet runs D1.
       if (skiftetRunsOn(d1)) {
-        var brWxCCW = d1wx; // Brändö/Åva on day 1
-        var iniWxCCW = iniD2; // Iniö on day 2
         options.push({
-          direction: 'ccw',
-          d1key: d1wx.key,
-          d2key: d2wx.key,
-          brWx: brWxCCW,
-          iniWx: iniWxCCW,
-          score: scoreOption(brWxCCW, iniWxCCW)
+          direction: 'ccw', d1key: d1wx.key, d2key: d2wx.key,
+          brWx: d1wx, iniWx: iniD2,
+          score: scoreOption(d1wx, iniD2)
         });
       }
     }
@@ -808,11 +1020,8 @@
 
   function ensureOptions(force) {
     if (optLoading) return;
-    // Try cache first
     var cached = null;
     try { cached = JSON.parse(localStorage.getItem(OPT_KEY) || 'null'); } catch (e) {}
-
-    // We can reuse the main weather cache (WX_KEY) if present
     var wxCached = null;
     try { wxCached = JSON.parse(localStorage.getItem(WX_KEY) || 'null'); } catch (e) {}
 
@@ -820,7 +1029,6 @@
       buildOptionsUI(cached.options, cached.ts);
       optLoaded = true;
     } else if (wxCached && wxCached.data) {
-      // Build options from existing weather cache without re-fetching
       var opts = computeOptions(wxCached.data);
       buildOptionsUI(opts, wxCached.ts);
       optLoaded = true;
@@ -857,7 +1065,6 @@
       var ok = results.some(function (r) { return r.sum; });
       if (ok) {
         try { localStorage.setItem(OPT_KEY, JSON.stringify({ ts: ts, options: opts })); } catch (e) {}
-        // Also refresh the main weather cache
         try { localStorage.setItem(WX_KEY, JSON.stringify({ ts: ts, data: results })); } catch (e) {}
       }
       buildOptionsUI(opts, ts);
@@ -869,11 +1076,11 @@
 
   $('#refreshOptions').addEventListener('click', function () { ensureOptions(true); });
 
-  /* ---------- RAIN RADAR (FMI WMS, animated) ---------- */
+  /* ---------- RAIN RADAR ---------- */
   var radar = { on: false, layer: null, frames: [], idx: 0, timer: null, playing: true };
   function radarFrames(count) {
     var FIVE = 5 * 60000;
-    var base = Math.floor(Date.now() / FIVE) * FIVE - FIVE; // last completed 5-min slot
+    var base = Math.floor(Date.now() / FIVE) * FIVE - FIVE;
     var arr = [];
     for (var i = count - 1; i >= 0; i--) arr.push(new Date(base - i * FIVE));
     return arr;
@@ -962,7 +1169,6 @@
   }
 
   /* ---------- Init ---------- */
-  // Reflect travel direction (from data) in the header subtitle + route title.
   (function () {
     var dir = (T.meta && T.meta.direction) ? T.meta.direction : '';
     var sub = document.querySelector('.app-header__sub');
@@ -975,6 +1181,93 @@
   buildFerryDayFilter();
   buildFerries();
   buildInfo();
-  // Map is the default view, so initialize it now; weather inits on first weather view.
-  if (document.getElementById('view-map').classList.contains('view--active')) initMap();
+
+  // Try to restore persisted selection (noNav=true: stay on options view)
+  (function () {
+    var stored = null;
+    try { stored = JSON.parse(localStorage.getItem(SEL_KEY) || 'null'); } catch (e) {}
+    if (stored && stored.direction && stored.d1key && stored.d2key) {
+      // Build a minimal opt object with just the keys (no wx data needed for applyOption meta steps)
+      applyOption({ direction: stored.direction, d1key: stored.d1key, d2key: stored.d2key }, true);
+    }
+  })();
+
+  // Default view is options; initialize it now.
+  if (document.getElementById('view-options').classList.contains('view--active')) {
+    ensureOptions();
+  }
+
+  /* ---------- Add to Home Screen (A2HS) toast ---------- */
+  (function () {
+    var DISMISSED_KEY = 'skiftet_a2hs_dismissed';
+    var toast = document.getElementById('a2hsToast');
+    var textEl = document.getElementById('a2hsText');
+    var addBtn = document.getElementById('a2hsAdd');
+    var closeBtn = document.getElementById('a2hsClose');
+    if (!toast) return;
+
+    // Already running as installed standalone PWA?
+    var isStandalone = (navigator.standalone === true) ||
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    if (isStandalone) return;
+
+    // Already dismissed by user?
+    if (localStorage.getItem(DISMISSED_KEY)) return;
+
+    var deferredPrompt = null;
+
+    function showToast() {
+      toast.classList.remove('hidden');
+    }
+    function hideToast() {
+      toast.classList.add('hidden');
+    }
+
+    // Chrome/Android: capture the native install prompt
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (localStorage.getItem(DISMISSED_KEY)) return;
+      setTimeout(showToast, 3500);
+    });
+
+    // After a successful install, hide the toast
+    window.addEventListener('appinstalled', function () {
+      hideToast();
+      deferredPrompt = null;
+    });
+
+    // "Lisää" button: trigger native prompt
+    if (addBtn) {
+      addBtn.addEventListener('click', function () {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(function () {
+          deferredPrompt = null;
+          hideToast();
+          localStorage.setItem(DISMISSED_KEY, '1');
+        });
+      });
+    }
+
+    // Dismiss "×"
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function () {
+        hideToast();
+        localStorage.setItem(DISMISSED_KEY, '1');
+      });
+    }
+
+    // iOS Safari fallback: no beforeinstallprompt, detect manually
+    var ua = navigator.userAgent || '';
+    var isIOS = /iphone|ipad|ipod/i.test(ua);
+    // Safari on iOS: has 'Safari' in UA but NOT 'CriOS' (Chrome iOS) or 'FxiOS' (Firefox iOS)
+    var isIOSSafari = isIOS && /safari/i.test(ua) && !/crios|fxios|opios|mercury/i.test(ua);
+    if (isIOSSafari) {
+      // Show iOS-specific instructions; hide the "Lisää" button (can't trigger programmatically)
+      if (textEl) textEl.textContent = 'Asenna: paina Jaa-painiketta ja valitse ‘Lisää Koti-valikkoon’';
+      if (addBtn) addBtn.classList.add('hidden');
+      setTimeout(showToast, 3500);
+    }
+  }());
 })();

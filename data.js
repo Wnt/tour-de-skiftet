@@ -75,12 +75,12 @@ window.TRIP = {
         { label: 'Varausportaali', url: 'https://boka.alandstrafiken.ax' }
       ],
       schedules: [
-        { direction: 'Osnäs → Åva', days: 'Ma', dow: [1], season: 'Kesä', times: ['10:35', '13:40', '16:35', '18:40'] },
-        { direction: 'Osnäs → Åva', days: 'Ti–La', dow: [2, 3, 4, 5, 6], season: 'Kesä', times: ['06:30', '10:35', '13:35', '16:35', '19:40'] },
-        { direction: 'Osnäs → Åva', days: 'Su', dow: [0], season: 'Kesä', times: ['10:35', '12:45', '15:05', '19:00'] },
-        { direction: 'Åva → Osnäs', days: 'Ma', dow: [1], season: 'Kesä', times: ['07:05', '12:45', '15:30', '17:30', '20:35'] },
-        { direction: 'Åva → Osnäs', days: 'Ti–La', dow: [2, 3, 4, 5, 6], season: 'Kesä', times: ['08:30', '12:30', '15:30', '18:30', '21:35'] },
-        { direction: 'Åva → Osnäs', days: 'Su', dow: [0], season: 'Kesä', times: ['11:30', '15:00', '17:00'] }
+        { direction: 'Osnäs → Åva', from: 'osnas', to: 'ava', days: 'Ma', dow: [1], season: 'Kesä', times: ['10:35', '13:40', '16:35', '18:40'] },
+        { direction: 'Osnäs → Åva', from: 'osnas', to: 'ava', days: 'Ti–La', dow: [2, 3, 4, 5, 6], season: 'Kesä', times: ['06:30', '10:35', '13:35', '16:35', '19:40'] },
+        { direction: 'Osnäs → Åva', from: 'osnas', to: 'ava', days: 'Su', dow: [0], season: 'Kesä', times: ['10:35', '12:45', '15:05', '19:00'] },
+        { direction: 'Åva → Osnäs', from: 'ava', to: 'osnas', days: 'Ma', dow: [1], season: 'Kesä', times: ['07:05', '12:45', '15:30', '17:30', '20:35'] },
+        { direction: 'Åva → Osnäs', from: 'ava', to: 'osnas', days: 'Ti–La', dow: [2, 3, 4, 5, 6], season: 'Kesä', times: ['08:30', '12:30', '15:30', '18:30', '21:35'] },
+        { direction: 'Åva → Osnäs', from: 'ava', to: 'osnas', days: 'Su', dow: [0], season: 'Kesä', times: ['11:30', '15:00', '17:00'] }
       ]
     },
     skiftet: {
@@ -95,9 +95,9 @@ window.TRIP = {
         { label: 'Houtskärin reitin aikataulu (PDF)', url: 'https://www.finferries.fi/media/aikataulut-2026/houtskarin-reitti-kesa-6.6.-18.8.2026.pdf' }
       ],
       schedules: [
-        { direction: 'Torsholma → Roslax', days: 'Ti–Pe, Su (ei ma/la)', dow: [0, 2, 3, 4, 5], season: 'Kesä', times: ['15:15'] },
-        { direction: 'Roslax → Torsholma', days: 'Ke, To, Pe, Su', dow: [0, 3, 4, 5], season: 'Kesä', times: ['12:20'] },
-        { direction: 'Roslax → Torsholma', days: 'Ti', dow: [2], season: 'Kesä', times: ['13:35'] }
+        { direction: 'Torsholma → Roslax', from: 'torsholma', to: 'roslax', days: 'Ti–Pe, Su (ei ma/la)', dow: [0, 2, 3, 4, 5], season: 'Kesä', times: ['15:15'] },
+        { direction: 'Roslax → Torsholma', from: 'roslax', to: 'torsholma', days: 'Ke, To, Pe, Su', dow: [0, 3, 4, 5], season: 'Kesä', times: ['12:20'] },
+        { direction: 'Roslax → Torsholma', from: 'roslax', to: 'torsholma', days: 'Ti', dow: [2], season: 'Kesä', times: ['13:35'] }
       ]
     },
     replot: {
@@ -112,10 +112,10 @@ window.TRIP = {
         { label: 'Mossala–Dalen aikataulu (PDF)', url: 'https://www.finferries.fi/media/aikataulut-2026/saariston-rengastie-houtskari-inio-8.5.-13.9.2026.pdf' }
       ],
       schedules: [
-        { direction: 'Mossala → Dalen', days: 'Ma–La', dow: [1, 2, 3, 4, 5, 6], season: 'Kesä', times: ['09:15', '12:15', '14:15', '16:15'] },
-        { direction: 'Mossala → Dalen', days: 'Su', dow: [0], season: 'Kesä', times: ['09:15', '11:45', '14:15', '16:15'] },
-        { direction: 'Dalen → Mossala', days: 'Ma–La', dow: [1, 2, 3, 4, 5, 6], season: 'Kesä', times: ['11:15', '13:15', '15:15', '17:45'] },
-        { direction: 'Dalen → Mossala', days: 'Su', dow: [0], season: 'Kesä', times: ['10:15', '13:15', '15:15', '17:45'] }
+        { direction: 'Mossala → Dalen', from: 'mossala', to: 'dalen', days: 'Ma–La', dow: [1, 2, 3, 4, 5, 6], season: 'Kesä', times: ['09:15', '12:15', '14:15', '16:15'] },
+        { direction: 'Mossala → Dalen', from: 'mossala', to: 'dalen', days: 'Su', dow: [0], season: 'Kesä', times: ['09:15', '11:45', '14:15', '16:15'] },
+        { direction: 'Dalen → Mossala', from: 'dalen', to: 'mossala', days: 'Ma–La', dow: [1, 2, 3, 4, 5, 6], season: 'Kesä', times: ['11:15', '13:15', '15:15', '17:45'] },
+        { direction: 'Dalen → Mossala', from: 'dalen', to: 'mossala', days: 'Su', dow: [0], season: 'Kesä', times: ['10:15', '13:15', '15:15', '17:45'] }
       ]
     },
     sterna: {
@@ -129,12 +129,12 @@ window.TRIP = {
         { label: 'Iniö–Kustavi aikataulu (PDF)', url: 'https://www.finferries.fi/media/aikataulut-2026/inio-kustavi-kesa-8.5.-13.9.2026.pdf' }
       ],
       schedules: [
-        { direction: 'Kannvik → Heponiemi', days: 'Ma–Pe', dow: [1, 2, 3, 4, 5], season: 'Kesä', times: ['06:30', '07:30', '09:30', '11:00', '14:45', '15:55', '18:00', '20:30'] },
-        { direction: 'Kannvik → Heponiemi', days: 'La', dow: [6], season: 'Kesä', times: ['07:30', '09:30', '11:00', '14:45', '15:55', '18:00'] },
-        { direction: 'Kannvik → Heponiemi', days: 'Su', dow: [0], season: 'Kesä', times: ['11:00', '13:30', '14:45', '15:55', '17:10', '19:15'] },
-        { direction: 'Heponiemi → Kannvik', days: 'Ma–Pe', dow: [1, 2, 3, 4, 5], season: 'Kesä', times: ['07:00', '08:10', '10:10', '11:45', '15:20', '16:30', '19:00', '21:00'] },
-        { direction: 'Heponiemi → Kannvik', days: 'La', dow: [6], season: 'Kesä', times: ['08:10', '10:10', '11:45', '15:20', '16:30', '19:00'] },
-        { direction: 'Heponiemi → Kannvik', days: 'Su', dow: [0], season: 'Kesä', times: ['11:45', '14:00', '15:20', '16:30', '18:30', '19:55'] }
+        { direction: 'Kannvik → Heponiemi', from: 'kannvik', to: 'heponiemi', days: 'Ma–Pe', dow: [1, 2, 3, 4, 5], season: 'Kesä', times: ['06:30', '07:30', '09:30', '11:00', '14:45', '15:55', '18:00', '20:30'] },
+        { direction: 'Kannvik → Heponiemi', from: 'kannvik', to: 'heponiemi', days: 'La', dow: [6], season: 'Kesä', times: ['07:30', '09:30', '11:00', '14:45', '15:55', '18:00'] },
+        { direction: 'Kannvik → Heponiemi', from: 'kannvik', to: 'heponiemi', days: 'Su', dow: [0], season: 'Kesä', times: ['11:00', '13:30', '14:45', '15:55', '17:10', '19:15'] },
+        { direction: 'Heponiemi → Kannvik', from: 'heponiemi', to: 'kannvik', days: 'Ma–Pe', dow: [1, 2, 3, 4, 5], season: 'Kesä', times: ['07:00', '08:10', '10:10', '11:45', '15:20', '16:30', '19:00', '21:00'] },
+        { direction: 'Heponiemi → Kannvik', from: 'heponiemi', to: 'kannvik', days: 'La', dow: [6], season: 'Kesä', times: ['08:10', '10:10', '11:45', '15:20', '16:30', '19:00'] },
+        { direction: 'Heponiemi → Kannvik', from: 'heponiemi', to: 'kannvik', days: 'Su', dow: [0], season: 'Kesä', times: ['11:45', '14:00', '15:20', '16:30', '18:30', '19:55'] }
       ]
     },
     skagen_jumo: {

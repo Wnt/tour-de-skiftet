@@ -370,3 +370,113 @@ h1, h2, h3, p { margin: 0; }
 @media (min-width: 640px) {
   .options-list { max-width: 720px; }
 }
+
+/* ---------- Option card: selected state ---------- */
+.opt-card--selected {
+  box-shadow: 0 0 0 2.5px var(--teal), var(--shadow);
+  border-color: var(--teal);
+}
+.opt-card--selected .opt-card__head {
+  background: #d3f4f7;
+}
+
+/* Valitse button inside option card */
+.opt-choose {
+  display: block;
+  margin: 10px 14px 4px;
+  width: calc(100% - 28px);
+  background: var(--teal);
+  color: #fff;
+  border-color: var(--teal);
+  font-weight: 700;
+  font-size: .88rem;
+  text-align: center;
+}
+.opt-choose:active { transform: scale(.97); }
+.opt-choose:disabled {
+  background: var(--land);
+  border-color: var(--land);
+  opacity: .85;
+  cursor: default;
+}
+
+/* ---------- Ferry card: trip day highlight ---------- */
+.ferry-card--trip {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 2px var(--teal), var(--shadow);
+}
+.ferry-card--trip .ferry-card__head {
+  background: #d3f4f7;
+  border-bottom-color: #a3e4ec;
+}
+.badge--trip {
+  background: var(--teal);
+  color: #fff;
+}
+
+/* A2HS (Add to Home Screen) toast */
+.a2hs-toast {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 10px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1.5px solid var(--teal);
+  border-radius: 14px;
+  padding: 12px 12px 12px 14px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.15), 0 1px 4px rgba(0,0,0,.08);
+  animation: a2hs-slide-in .35s cubic-bezier(.22,1,.36,1) both;
+  max-width: 480px;
+  margin: 0 auto;
+}
+@media (min-width: 520px) {
+  .a2hs-toast {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: calc(100% - 24px);
+    max-width: 480px;
+  }
+}
+@keyframes a2hs-slide-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.a2hs-toast.hidden { display: none !important; animation: none; }
+.a2hs-toast__icon { font-size: 1.45rem; flex-shrink: 0; }
+.a2hs-toast__text {
+  flex: 1;
+  font-size: .84rem;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.35;
+}
+.a2hs-toast__add {
+  flex-shrink: 0;
+  border: none;
+  background: var(--teal);
+  color: #fff;
+  font-size: .82rem;
+  font-weight: 800;
+  padding: 7px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.a2hs-toast__add:active { opacity: .85; transform: scale(.96); }
+.a2hs-toast__close {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 4px 6px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.a2hs-toast__close:hover { background: var(--bg); }

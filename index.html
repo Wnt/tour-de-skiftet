@@ -27,7 +27,7 @@
 
   <main class="app-main">
     <!-- MAP -->
-    <section id="view-map" class="view view--active" aria-label="Kartta">
+    <section id="view-map" class="view" aria-label="Kartta">
       <div id="map"></div>
       <div class="map-controls">
         <button id="radarBtn" class="map-btn" title="Sadetutka päälle/pois">🌧️</button>
@@ -49,10 +49,10 @@
     <section id="view-route" class="view" aria-label="Reitti">
       <div class="scroll-pad">
         <div class="summary-bar" id="routeSummary"></div>
+        <h2 class="section-title section-title--flush">Ehdotettu päiväohjelma · 2 yötä</h2>
+        <div id="dayPlan" class="day-plan"></div>
         <h2 class="section-title" id="routeTitle">Reitti vaiheittain</h2>
         <div id="legList" class="leg-list"></div>
-        <h2 class="section-title">Ehdotettu päiväohjelma · 2 yötä</h2>
-        <div id="dayPlan" class="day-plan"></div>
       </div>
     </section>
 
@@ -86,7 +86,7 @@
     </section>
 
     <!-- OPTIONS -->
-    <section id="view-options" class="view" aria-label="Vaihtoehdot">
+    <section id="view-options" class="view view--active" aria-label="Vaihtoehdot">
       <div class="scroll-pad">
         <div class="weather-head">
           <div>
@@ -115,13 +115,20 @@
   </main>
 
   <nav class="tabbar" role="tablist">
-    <button class="tab tab--active" data-view="map"><span class="tab__icon">🗺️</span><span class="tab__label">Kartta</span></button>
+    <button class="tab tab--active" data-view="options"><span class="tab__icon">⚖️</span><span class="tab__label">Vaihtoehdot</span></button>
     <button class="tab" data-view="route"><span class="tab__icon">🚲</span><span class="tab__label">Reitti</span></button>
     <button class="tab" data-view="ferries"><span class="tab__icon">⛴️</span><span class="tab__label">Lautat</span></button>
     <button class="tab" data-view="weather"><span class="tab__icon">🌤️</span><span class="tab__label">Sää</span></button>
-    <button class="tab" data-view="options"><span class="tab__icon">⚖️</span><span class="tab__label">Vaihtoehdot</span></button>
+    <button class="tab" data-view="map"><span class="tab__icon">🗺️</span><span class="tab__label">Kartta</span></button>
     <button class="tab" data-view="info"><span class="tab__icon">ℹ️</span><span class="tab__label">Info</span></button>
   </nav>
+
+  <div id="a2hsToast" class="a2hs-toast hidden" role="status" aria-live="polite">
+    <span class="a2hs-toast__icon">📲</span>
+    <span class="a2hs-toast__text" id="a2hsText">Lisää sovellus kotinäyttöön</span>
+    <button id="a2hsAdd" class="a2hs-toast__add">Lisää</button>
+    <button id="a2hsClose" class="a2hs-toast__close" aria-label="Sulje">×</button>
+  </div>
 
   <script src="vendor/leaflet.js"></script>
   <script src="geometry.js"></script>
