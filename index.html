@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b7285" />
+  <title>Tour de Skiftet — Fillarireissu</title>
+  <meta name="description" content="Interaktiivinen reittikartta: fillarimatkat, lauttojen aikataulut ja sääennuste. Kustavi · Brändö · Houtskär · Iniö." />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/icon-180.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="stylesheet" href="vendor/leaflet.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-header__title">
+      <span class="app-header__logo">🚲</span>
+      <div>
+        <h1>Tour de Skiftet</h1>
+        <p class="app-header__sub">Kustavi · Brändö · Houtskär · Iniö — vastapäivään</p>
+      </div>
+    </div>
+    <div id="netStatus" class="net-status" title="Verkkoyhteyden tila" aria-live="polite"></div>
+  </header>
+
+  <main class="app-main">
+    <!-- MAP -->
+    <section id="view-map" class="view view--active" aria-label="Kartta">
+      <div id="map"></div>
+      <div class="map-controls">
+        <button id="radarBtn" class="map-btn" title="Sadetutka päälle/pois">🌧️</button>
+        <button id="locateBtn" class="map-btn" title="Paikanna minut">📍</button>
+        <button id="fitBtn" class="map-btn" title="Sovita koko reitti näkyviin">🗺️</button>
+      </div>
+      <div id="radarBar" class="radar-bar hidden">
+        <button id="radarPlay" class="radar-play" title="Toista / tauko">⏸</button>
+        <input id="radarSlider" class="radar-slider" type="range" min="0" max="15" value="15" aria-label="Sadetutkan aika" />
+        <span id="radarTime" class="radar-time">–</span>
+      </div>
+      <div id="mapOfflineNote" class="map-offline-note hidden">
+        Karttaruudut latautuvat verkossa. Avaa kartta kerran verkkoyhteydessä, niin se tallentuu offline-käyttöön.
+        Reitti, etäisyydet ja aikataulut toimivat ilman verkkoa <b>Reitti</b>- ja <b>Lautat</b>-välilehdillä.
+      </div>
+    </section>
+
+    <!-- ROUTE / ITINERARY -->
+    <section id="view-route" class="view" aria-label="Reitti">
+      <div class="scroll-pad">
+        <div class="summary-bar" id="routeSummary"></div>
+        <h2 class="section-title" id="routeTitle">Reitti vaiheittain</h2>
+        <div id="legList" class="leg-list"></div>
+        <h2 class="section-title">Ehdotettu päiväohjelma · 2 yötä</h2>
+        <div id="dayPlan" class="day-plan"></div>
+      </div>
+    </section>
+
+    <!-- FERRIES -->
+    <section id="view-ferries" class="view" aria-label="Lautat">
+      <div class="scroll-pad">
+        <div class="info-callout">
+          ⚓ Monet saariston yhteysalukset vaativat <b>ennakkovarauksen</b>. Tarkista ajat aina operaattorilta ennen lähtöä — aikataulut voivat muuttua.
+        </div>
+        <div class="day-filter">
+          <label for="ferryDay">Näytä päivälle:</label>
+          <select id="ferryDay"></select>
+        </div>
+        <div id="ferryList" class="ferry-list"></div>
+      </div>
+    </section>
+
+    <!-- WEATHER -->
+    <section id="view-weather" class="view" aria-label="Sää">
+      <div class="scroll-pad">
+        <div class="weather-head">
+          <div>
+            <h2 class="section-title section-title--flush">Sääennuste</h2>
+            <p id="weatherUpdated" class="muted small"></p>
+          </div>
+          <button id="refreshWeather" class="pill-btn">↻ Päivitä</button>
+        </div>
+        <p class="muted small">Tuuli on saaristossa pyöräilijälle tärkein — se näkyy korostettuna. Sadetutka löytyy Kartta-välilehdeltä (🌧️). Lähde: Ilmatieteen laitos (FMI) avoin data.</p>
+        <div id="weatherList" class="weather-list"></div>
+      </div>
+    </section>
+
+    <!-- INFO -->
+    <section id="view-info" class="view" aria-label="Info">
+      <div class="scroll-pad">
+        <h2 class="section-title section-title--flush">Majoitus</h2>
+        <div id="lodgingList" class="lodging-list"></div>
+        <h2 class="section-title">Hyvä tietää</h2>
+        <div id="infoNotes" class="info-notes"></div>
+        <h2 class="section-title">Lähteet & varmistettavat tiedot</h2>
+        <div id="sourceNotes" class="info-notes"></div>
+        <p class="muted small" id="appMeta"></p>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabbar" role="tablist">
+    <button class="tab tab--active" data-view="map"><span class="tab__icon">🗺️</span><span class="tab__label">Kartta</span></button>
+    <button class="tab" data-view="route"><span class="tab__icon">🚲</span><span class="tab__label">Reitti</span></button>
+    <button class="tab" data-view="ferries"><span class="tab__icon">⛴️</span><span class="tab__label">Lautat</span></button>
+    <button class="tab" data-view="weather"><span class="tab__icon">🌤️</span><span class="tab__label">Sää</span></button>
+    <button class="tab" data-view="info"><span class="tab__icon">ℹ️</span><span class="tab__label">Info</span></button>
+  </nav>
+
+  <script src="vendor/leaflet.js"></script>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

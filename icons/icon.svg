@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b7285"/><stop offset="1" stop-color="#095968"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#g)"/>
+  <!-- waves -->
+  <g fill="none" stroke="#99e9f2" stroke-width="14" stroke-linecap="round" opacity="0.9">
+    <path d="M70 360 q35 -28 70 0 t70 0 t70 0 t70 0 t70 0"/>
+    <path d="M70 400 q35 -28 70 0 t70 0 t70 0 t70 0 t70 0"/>
+  </g>
+  <!-- bicycle -->
+  <g fill="none" stroke="#ffffff" stroke-width="20" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="150" cy="250" r="62"/>
+    <circle cx="362" cy="250" r="62"/>
+    <path d="M150 250 L232 250 L300 160 L210 160"/>
+    <path d="M232 250 L300 160"/>
+    <path d="M362 250 L300 160"/>
+    <path d="M150 250 L210 160"/>
+  </g>
+  <circle cx="256" cy="250" r="10" fill="#e8590c"/>
+</svg>

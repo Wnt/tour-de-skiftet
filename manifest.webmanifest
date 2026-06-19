@@ -1,0 +1,18 @@
+{
+  "name": "Tour de Skiftet — Fillarireissu",
+  "short_name": "Skiftet",
+  "description": "Interaktiivinen reittikartta: fillarimatkat, lauttojen aikataulut ja sääennuste. Kustavi · Brändö · Houtskär · Iniö.",
+  "lang": "fi",
+  "start_url": "./index.html",
+  "scope": "./",
+  "id": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eef6f7",
+  "theme_color": "#0b7285",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
