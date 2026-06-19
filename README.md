@@ -1,5 +1,8 @@
 # Tour de Skiftet — fillarireissun reittiopas
 
+**▶ Live: https://wnt.github.io/tour-de-skiftet/**
+
+
 Interaktiivinen, mobiilikäyttöön ja offline-tilaan suunniteltu reittiopas saariston
 rengastien pohjoiselle lenkille **Kustavi → Brändö → Houtskär → Iniö → Kustavi**
 (vastapäivään). Yhdellä sivulla:
