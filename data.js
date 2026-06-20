@@ -45,7 +45,7 @@ window.TRIP = {
     { day: 1, from: 'jumo',      to: 'skagen',    mode: 'ferry', km: 0.6,  ferry: 'skagen_jumo', note: 'Kaapelilossi, tarvittaessa' },
     { day: 1, from: 'skagen',    to: 'dalen',     mode: 'bike',  km: 4.4,  island: 'Iniö', note: '' },
     { day: 1, from: 'dalen',     to: 'mossala',   mode: 'ferry', km: 12,   ferry: 'replot', note: 'Maksullinen (pyörä 12 €)' },
-    { day: 1, from: 'mossala',   to: 'nasby',     mode: 'bike',  km: 16.4, island: 'Houtskär', note: 'Matkalla 2 kaapelilossia: Mossala–Björkö ja Kivimo–Roslax' },
+    { day: 1, from: 'mossala',   to: 'nasby',     mode: 'bike',  km: 16.4, island: 'Houtskär', note: '' },
     // DAY 2 — Ti 23.6  Houtskär → Brändö → Kustavi  (paras pyöräsää)
     { day: 2, from: 'nasby',     to: 'roslax',    mode: 'bike',  km: 5,    island: 'Houtskär', note: 'Suora maantie Roslaxin lauttarantaan — ei kaapelilossia' },
     { day: 2, from: 'roslax',    to: 'torsholma', mode: 'ferry', km: 55,   ferry: 'skiftet', note: 'Houtskärin reitti ~2 h (m/s Rosala 2) — varaa edellisenä päivänä klo 17' },

@@ -803,6 +803,13 @@ h1, h2, h3, p { margin: 0; }
 }
 .day-card__gmaps-link:active { opacity: .7; }
 
+/* Road cable ferry (lossi) chip shown under the bike leg it is crossed on */
+.dp-lossi {
+  display: inline-flex; align-items: center; gap: 5px; align-self: flex-start;
+  margin-top: 4px; font-size: .73rem; font-weight: 700; color: var(--teal-dark);
+  background: #e3f7fb; border: 1px solid #a3e4ec; border-radius: 999px; padding: 3px 9px;
+}
+
 /* Wrapper to hold both the row text and the maps link below it */
 .day-card__bike-cell {
   display: flex;

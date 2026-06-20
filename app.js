@@ -141,15 +141,25 @@
     'torsholma>roslax': 'Houtskärin reitti ~2 h (m/s Rosala 2) — varaa jo ennen matkaa, edellisiltana klo 17 (su: la klo 14)'
   };
   // Direction- & base-aware note for a leg; undefined keeps the canonical note.
+  // (Cable ferries crossed on a leg are shown as their own chips, not in the note.)
   function directionalNote(from, to, base) {
     if (from === base && to === 'heponiemi') return 'Lauttarantaan — retki alkaa';
     if (from === 'heponiemi' && to === base) return 'Takaisin lähtöpisteeseen — matka päättyy';
-    if (from === base && (to === 'kivimaa' || to === 'osnas'))
-      return to === 'osnas' ? 'Kohti Osnäsin lauttaa — retki alkaa (Vartsalan lossi matkalla)' : 'Kohti Osnäsin lauttaa — retki alkaa';
-    if ((from === 'kivimaa' || from === 'osnas') && to === base)
-      return from === 'osnas' ? 'Takaisin lähtöpisteeseen — matka päättyy (Vartsalan lossi matkalla)' : 'Takaisin lähtöpisteeseen — matka päättyy';
-    if ((from === 'osnas' && to === 'kivimaa') || (from === 'kivimaa' && to === 'osnas')) return 'Matkalla Vartsalan kaapelilossi';
+    if (from === base && (to === 'kivimaa' || to === 'osnas')) return 'Kohti Osnäsin lauttaa — retki alkaa';
+    if ((from === 'kivimaa' || from === 'osnas') && to === base) return 'Takaisin lähtöpisteeseen — matka päättyy';
     return FIXED_DIR_NOTES[from + '>' + to];
+  }
+
+  // Road cable ferries (lossi) crossed DURING a bike leg — shown as visible chips.
+  // Keyed by the leg's two places, sorted and joined with "|".
+  var CABLE_FERRIES_BY_LEG = {
+    'kivimaa|osnas':   [{ name: 'Vartsalan lossi', note: 'maksuton · kulkee tarvittaessa' }],
+    'lootholma|osnas': [{ name: 'Vartsalan lossi', note: 'maksuton · kulkee tarvittaessa' }],
+    'mossala|nasby':   [{ name: 'Mossala–Björkö lossi', note: 'maksuton · kulkee tarvittaessa' },
+                        { name: 'Kivimo–Roslax lossi', note: 'maksuton · kulkee tarvittaessa' }]
+  };
+  function cableFerriesOnLeg(from, to) {
+    return CABLE_FERRIES_BY_LEG[[from, to].sort().join('|')] || [];
   }
 
   /* Direction-aware lodging plan for a day (Kustavi nights use the active base). */
@@ -727,10 +737,15 @@
               '" target="_blank" rel="noopener">🧭 Reittiohjeet →</a>';
           }
 
+          /* Cable ferries (lossi) crossed on this leg — shown as visible chips */
+          var cfHtml = cableFerriesOnLeg(s.from, s.to).map(function (f) {
+            return '<span class="dp-lossi">⛴ ' + f.name + ' · ' + f.note + '</span>';
+          }).join('');
+
           var row = el('div', 'day-card__row');
           row.innerHTML =
             '<span class="t">' + tLabel + '</span>' +
-            '<span class="day-card__bike-cell">' + routeText + mapsHtml + '</span>';
+            '<span class="day-card__bike-cell">' + routeText + cfHtml + mapsHtml + '</span>';
           body.appendChild(row);
 
         } else if (s.type === 'ferry') {
