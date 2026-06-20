@@ -15,13 +15,13 @@ window.TRIP = {
   /* ---- Places (keys referenced by legs) ---- */
   places: {
     peterzens:   { name: 'Peterzens Boathouse', island: 'Kustavi (Laupunen)', type: 'accommodation', lat: 60.4950, lon: 21.4400 },
-    heponiemi:   { name: 'Heponiemi (lauttaranta)', island: 'Kustavi', type: 'ferryTerminal', lat: 60.4873, lon: 21.4358 },
+    heponiemi:   { name: 'Heponiemi (lauttaranta)', island: 'Kustavi', type: 'ferryTerminal', lat: 60.4851, lon: 21.4351 },
     kivimaa:     { name: 'Kivimaa (Kustavin keskusta)', island: 'Kustavi', type: 'town', lat: 60.5449, lon: 21.3556 },
-    vartsala:    { name: 'Vartsala', island: 'Kustavi', type: 'village', lat: 60.4930, lon: 21.3850 },
+    vartsala:    { name: 'Vartsala', island: 'Kustavi', type: 'village', lat: 60.5360, lon: 21.3008 },
     osnas:       { name: 'Osnäs / Vuosnainen (lauttaranta)', island: 'Kustavi', type: 'ferryTerminal', lat: 60.5074, lon: 21.2474 },
     ava:         { name: 'Åva (lauttaranta)', island: 'Brändö', type: 'ferryTerminal', lat: 60.5032, lon: 21.0572 },
-    jurmo:       { name: 'Jurmo', island: 'Brändö', type: 'side', lat: 60.5262, lon: 21.0720 },
-    brando_kby:  { name: 'Brändön kirkonkylä', island: 'Brändö', type: 'village', lat: 60.4180, lon: 21.0300 },
+    jurmo:       { name: 'Jurmo', island: 'Brändö', type: 'side', lat: 60.5169, lon: 21.0766 },
+    brando_kby:  { name: 'Brändön kirkonkylä', island: 'Brändö', type: 'village', lat: 60.4176, lon: 21.0334 },
     torsholma:   { name: 'Torsholma (lauttaranta)', island: 'Brändö', type: 'ferryTerminal', lat: 60.3566, lon: 21.0382 },
     lappo:       { name: 'Lappo', island: 'Brändö', type: 'side', lat: 60.3170, lon: 20.9920 },
     asterholma:  { name: 'Asterholma', island: 'Brändö', type: 'side', lat: 60.3042, lon: 21.0375 },
@@ -30,19 +30,19 @@ window.TRIP = {
     bjorko:      { name: 'Björkö', island: 'Houtskär', type: 'village', lat: 60.2655, lon: 21.4051 },
     mossala:     { name: 'Mossala (lauttaranta)', island: 'Houtskär', type: 'ferryTerminal', lat: 60.2883, lon: 21.4397 },
     dalen:       { name: 'Dalen (lauttaranta)', island: 'Iniö', type: 'ferryTerminal', lat: 60.3817, lon: 21.3717 },
-    skagen:      { name: 'Skagen (lossi)', island: 'Iniö', type: 'ferryTerminal', lat: 60.4090, lon: 21.3692 },
-    jumo:        { name: 'Jumo', island: 'Iniö', type: 'village', lat: 60.4330, lon: 21.3830 },
+    skagen:      { name: 'Skagen (lossi)', island: 'Iniö', type: 'ferryTerminal', lat: 60.4060, lon: 21.3685 },
+    jumo:        { name: 'Jumo (lauttaranta)', island: 'Iniö', type: 'ferryTerminal', lat: 60.4116, lon: 21.3699 },
     kannvik:     { name: 'Kannvik (lauttaranta)', island: 'Iniö', type: 'ferryTerminal', lat: 60.4393, lon: 21.3960 }
   },
 
   /* ---- Legs in travel order (counter-clockwise) ---- */
   legs: [
     // DAY 1 — Ma 22.6  Kustavi → Iniö → Houtskär  (poutainen)
-    { day: 1, from: 'peterzens', to: 'heponiemi', mode: 'bike',  km: 0.6,  island: 'Kustavi', note: 'Lauttarantaan' },
+    { day: 1, from: 'peterzens', to: 'heponiemi', mode: 'bike',  km: 1.3,  island: 'Kustavi', note: 'Lauttarantaan' },
     { day: 1, from: 'heponiemi', to: 'kannvik',   mode: 'ferry', km: 10,   ferry: 'sterna', note: 'Maksuton, ei varausta' },
-    { day: 1, from: 'kannvik',   to: 'jumo',      mode: 'bike',  km: 4,    island: 'Iniö', note: '' },
-    { day: 1, from: 'jumo',      to: 'skagen',    mode: 'ferry', km: 0.7,  ferry: 'skagen_jumo', note: 'Kaapelilossi, tarvittaessa' },
-    { day: 1, from: 'skagen',    to: 'dalen',     mode: 'bike',  km: 5,    island: 'Iniö', note: '' },
+    { day: 1, from: 'kannvik',   to: 'jumo',      mode: 'bike',  km: 4.1,  island: 'Iniö', note: '' },
+    { day: 1, from: 'jumo',      to: 'skagen',    mode: 'ferry', km: 0.6,  ferry: 'skagen_jumo', note: 'Kaapelilossi, tarvittaessa' },
+    { day: 1, from: 'skagen',    to: 'dalen',     mode: 'bike',  km: 4.4,  island: 'Iniö', note: '' },
     { day: 1, from: 'dalen',     to: 'mossala',   mode: 'ferry', km: 12,   ferry: 'replot', note: 'Maksullinen (pyörä 12 €)' },
     { day: 1, from: 'mossala',   to: 'nasby',     mode: 'bike',  km: 16.4, island: 'Houtskär', note: 'Matkalla 2 kaapelilossia: Mossala–Björkö ja Kivimo–Roslax' },
     // DAY 2 — Ti 23.6  Houtskär → Brändö → Kustavi  (paras pyöräsää)
