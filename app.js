@@ -1516,12 +1516,6 @@
     var headHtml = '<div class="opt-card__dir"><span class="opt-dir-icon">' + dirIcon + '</span>' +
       '<div><div class="opt-dir-name">' + dirName + '</div><div class="opt-dir-sub">' + dirSub + '</div></div></div>';
 
-    // INACTIVE — past day
-    if (opt.status === 'past') {
-      var pc = el('div', 'opt-card opt-card--inactive');
-      pc.innerHTML = '<div class="opt-card__head">' + headHtml + '</div><div class="opt-inactive-reason">⏳ Mennyt päivä.</div>';
-      return pc;
-    }
     // INACTIVE — Skiftet does not run on the Brändö day
     if (opt.status === 'noFerry') {
       var brWd = WEEKDAYS_FI_LONG[dateFromKey(opt.brandoKey).getDay()].toLowerCase();
@@ -1548,18 +1542,20 @@
     card.appendChild(head);
 
     var body = el('div', 'opt-card__body');
-    if (opt.brWx && opt.iniWx) {
-      if (opt.direction === 'cw') {
-        body.appendChild(renderDayStrip(opt.iniWx, 'Päivä 1 · Iniö', false));
-        body.appendChild(renderDayStrip(opt.brWx, 'Päivä 2 · Brändö ⚓', true));
-      } else {
-        body.appendChild(renderDayStrip(opt.brWx, 'Päivä 1 · Brändö ⚓', true));
-        body.appendChild(renderDayStrip(opt.iniWx, 'Päivä 2 · Iniö', false));
-      }
-      body.appendChild(el('div', 'opt-verdict', '<b>Brändö-päivä:</b> ' + brandoVerdict(opt.brWx)));
-    } else {
-      body.appendChild(el('div', 'opt-verdict', 'Sääennuste ei kata näitä päiviä vielä — valittavissa silti.'));
+    function dayStripOrNote(wx, label, highlight) {
+      if (wx) return renderDayStrip(wx, label, highlight);
+      var d = el('div', 'opt-day-strip opt-day-strip--nowx' + (highlight ? ' opt-day-strip--highlight' : ''));
+      d.innerHTML = '<div class="opt-day-label">' + label + '</div><div class="opt-day-nowx">Sääennustetta ei saatavilla</div>';
+      return d;
     }
+    if (opt.direction === 'cw') {
+      body.appendChild(dayStripOrNote(opt.iniWx, 'Päivä 1 · Iniö', false));
+      body.appendChild(dayStripOrNote(opt.brWx, 'Päivä 2 · Brändö ⚓', true));
+    } else {
+      body.appendChild(dayStripOrNote(opt.brWx, 'Päivä 1 · Brändö ⚓', true));
+      body.appendChild(dayStripOrNote(opt.iniWx, 'Päivä 2 · Iniö', false));
+    }
+    if (opt.brWx) body.appendChild(el('div', 'opt-verdict', '<b>Brändö-päivä:</b> ' + brandoVerdict(opt.brWx)));
     var chooseBtn = el('button', 'opt-choose pill-btn', isSelected ? 'Valittu ✓' : 'Valitse tämä');
     if (isSelected) chooseBtn.disabled = true;
     (function (o) {
@@ -1587,10 +1583,16 @@
       var grp = el('div', 'opt-daygroup');
       grp.setAttribute('data-daykey', dkey);
       var isToday = dkey === tKey;
+      var todayMs = dateFromKey(tKey).getTime();
+      var ongoing = d1.getTime() < todayMs && d2.getTime() >= todayMs; // trip in progress (day 2 today)
+      var pastGroup = d2.getTime() < todayMs;                          // fully in the past
+      var tag = isToday ? ' <span class="opt-today-tag">tänään</span>'
+        : ongoing ? ' <span class="opt-today-tag opt-tag--ongoing">käynnissä</span>'
+        : pastGroup ? ' <span class="opt-tag--past">mennyt</span>' : '';
       var label = WEEKDAYS_FI[d1.getDay()] + ' ' + d1.getDate() + '.' + (d1.getMonth() + 1) + '. → ' +
         WEEKDAYS_FI[d2.getDay()] + ' ' + d2.getDate() + '.' + (d2.getMonth() + 1) + '.';
-      grp.appendChild(el('div', 'opt-daygroup__head' + (isToday ? ' opt-daygroup__head--today' : ''),
-        label + (isToday ? ' <span class="opt-today-tag">tänään</span>' : '')));
+      grp.appendChild(el('div', 'opt-daygroup__head' + (isToday || ongoing ? ' opt-daygroup__head--today' : ''),
+        label + tag));
       groups[dkey].forEach(function (o) { grp.appendChild(renderOptionCard(o, best)); });
       wrap.appendChild(grp);
     });
@@ -1658,11 +1660,13 @@
         var brWx = brMap[brandoKey] || null;
         var iniWx = iniMap[iniKey] || null;
         var ferryOk = skiftetRunsOn(brandoDate);
-        var status = past ? 'past' : (!ferryOk ? 'noFerry' : 'ok');
-        var score = (status === 'ok' && brWx && iniWx) ? scoreOption(brWx, iniWx) : Infinity;
+        // Past days stay selectable (mid-trip use): only no-ferry days are inactive.
+        var status = !ferryOk ? 'noFerry' : 'ok';
+        // Auto-default ranking only considers future options with weather (past has none).
+        var score = (status === 'ok' && !past && brWx && iniWx) ? scoreOption(brWx, iniWx) : Infinity;
         opts.push({
           direction: dir, d1key: d1key, d2key: d2key, brandoKey: brandoKey,
-          brWx: brWx, iniWx: iniWx, status: status, score: score
+          brWx: brWx, iniWx: iniWx, status: status, score: score, past: past
         });
       });
     }
