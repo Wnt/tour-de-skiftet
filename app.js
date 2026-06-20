@@ -134,6 +134,13 @@
     return s.replace('.', ',');
   }
 
+  /* ---------- fmtMm: format millimetres with Finnish decimal comma, 1 decimal ---------- */
+  function fmtMm(mm) {
+    if (mm == null || isNaN(mm)) return '0';
+    var s = (+mm).toFixed(1);
+    return s.replace('.', ',');
+  }
+
   /* ---------- tripProgress: persisted { dateKey: { ferryId: 'HH:MM' } } ---------- */
   var PROGRESS_KEY = 'skiftet_progress_v1';
 
@@ -1285,18 +1292,20 @@
     var days = {}, order = [];
     times.forEach(function (ts) {
       var k = dayKeyHelsinki(ts);
-      if (!days[k]) { days[k] = { key: k, tmax: -99, tmin: 99, precip: 0, windMax: 0, windDir: null, pop: 0, noon: null, syms: {} }; order.push(k); }
+      if (!days[k]) { days[k] = { key: k, tmax: -99, tmin: 99, precip: 0, dayPrecip: 0, windMax: 0, windDir: null, pop: 0, noon: null, syms: {} }; order.push(k); }
       var d = days[k];
       var tv = mT[ts]; if (tv != null) { if (tv > d.tmax) d.tmax = tv; if (tv < d.tmin) d.tmin = tv; }
       var wv = mW[ts]; if (wv != null && wv > d.windMax) { d.windMax = wv; d.windDir = mWD[ts]; }
       var pv = mP[ts]; if (pv != null) d.precip += pv;
       var pp = mPOP[ts]; if (pp != null && pp > d.pop) d.pop = pp;
-      var sv = mS[ts]; if (sv != null) { d.syms[sv] = (d.syms[sv] || 0) + 1; var h = hourInHelsinki(ts); if (h >= 12 && h <= 15 && d.noon == null) d.noon = sv; }
+      var h = hourInHelsinki(ts);
+      if (pv != null && h >= 9 && h <= 18) d.dayPrecip += pv;
+      var sv = mS[ts]; if (sv != null) { d.syms[sv] = (d.syms[sv] || 0) + 1; if (h >= 12 && h <= 15 && d.noon == null) d.noon = sv; }
     });
     var dayList = order.map(function (k) {
       var d = days[k], best = null, bn = -1;
       for (var s in d.syms) { if (d.syms[s] > bn) { bn = d.syms[s]; best = +s; } }
-      return { key: k, tmax: Math.round(d.tmax), tmin: Math.round(d.tmin), precip: d.precip, windMax: Math.round(d.windMax), windDir: d.windDir, pop: Math.round(d.pop), sym: d.noon != null ? d.noon : best };
+      return { key: k, tmax: Math.round(d.tmax), tmin: Math.round(d.tmin), precip: d.precip, dayPrecip: d.dayPrecip, windMax: Math.round(d.windMax), windDir: d.windDir, pop: Math.round(d.pop), sym: d.noon != null ? d.noon : best };
     });
     return { current: cur, days: dayList };
   }
@@ -1441,7 +1450,7 @@
       '<div class="opt-day-desc">' + si.t + '</div>' +
       '<div class="opt-day-temp">' + wx.tmax + '° <span class="opt-tmin">/ ' + wx.tmin + '°</span></div>' +
       '<div class="opt-day-wind">💨 ' + (wd.arrow || '') + ' ' + wx.windMax + ' m/s</div>' +
-      '<div class="opt-day-rain">' + wx.pop + ' % sade</div>';
+      '<div class="opt-day-rain" title="sade klo 9\u201319">' + wx.pop + ' %\u00a0\u00b7 ' + fmtMm(wx.dayPrecip != null ? wx.dayPrecip : 0) + '\u00a0mm</div>';
     return div;
   }
 
@@ -1521,8 +1530,8 @@
       var brWd = WEEKDAYS_FI_LONG[dateFromKey(opt.brandoKey).getDay()].toLowerCase();
       var nc = el('div', 'opt-card opt-card--inactive');
       nc.innerHTML = '<div class="opt-card__head">' + headHtml + '</div>' +
-        '<div class="opt-inactive-reason">⚓ Skiftet-lautta ei liikennöi ' + brWd + 'na (Brändö-päivä) — Brändö–Houtskär-yhteyttä ei tähän suuntaan ole.</div>';
-      var link = el('a', 'opt-sched-link', 'Skiftetin aikataulu →');
+        '<div class="opt-inactive-reason">⚓ Houtskärin reitin yhteysalus ei liikennöi ' + brWd + 'na (Brändö-päivä) — Brändö–Houtskär-yhteyttä ei tähän suuntaan ole.</div>';
+      var link = el('a', 'opt-sched-link', 'Houtskärin reitin aikataulu →');
       link.href = 'javascript:void(0)';
       link.addEventListener('click', function (e) { e.preventDefault(); openFerrySchedule('skiftet', opt.brandoKey); });
       nc.appendChild(link);

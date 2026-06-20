@@ -47,7 +47,7 @@ window.TRIP = {
     { day: 1, from: 'mossala',   to: 'nasby',     mode: 'bike',  km: 11,   island: 'Houtskär', note: 'Björkö–Mossala kaapelilossi' },
     // DAY 2 — Ti 23.6  Houtskär → Brändö → Kustavi  (paras pyöräsää)
     { day: 2, from: 'nasby',     to: 'roslax',    mode: 'bike',  km: 6,    island: 'Houtskär', note: 'Lyhyt kaapelilossi matkalla' },
-    { day: 2, from: 'roslax',    to: 'torsholma', mode: 'ferry', km: 55,   ferry: 'skiftet', note: 'Skiftet-ylitys ~2 h — varaa edellisenä päivänä klo 17' },
+    { day: 2, from: 'roslax',    to: 'torsholma', mode: 'ferry', km: 55,   ferry: 'skiftet', note: 'Houtskärin reitti ~2 h (m/s Rosala 2) — varaa edellisenä päivänä klo 17' },
     { day: 2, from: 'torsholma', to: 'brando_kby',mode: 'bike',  km: 8.6,  island: 'Brändö', note: '' },
     { day: 2, from: 'brando_kby',to: 'ava',       mode: 'bike',  km: 12.5, island: 'Brändö', note: 'Lounastauko' },
     { day: 2, from: 'ava',       to: 'osnas',     mode: 'ferry', km: 25,   ferry: 'adan',   note: 'Ådan — maksuton tähän suuntaan' },
@@ -84,7 +84,7 @@ window.TRIP = {
       ]
     },
     skiftet: {
-      name: 'Torsholma ↔ Roslax (Skiftet-ylitys)',
+      name: 'Torsholma ↔ Roslax · Houtskärin reitti',
       operator: 'Finferries · m/s Rosala 2',
       crossingMin: 135,
       booking: 'yes',
@@ -105,7 +105,7 @@ window.TRIP = {
     },
     replot: {
       name: 'Mossala ↔ Dalen',
-      operator: 'Finferries · M/S Replot',
+      operator: 'Finferries · M/S Replot 2',
       crossingMin: 60,
       booking: 'recommended',
       price: 'Maksullinen: aikuinen 10 €, lapsi 5 €, polkupyörä 12 €, henkilöauto 45 €.',
@@ -178,11 +178,11 @@ window.TRIP = {
 
   /* ---- Info notes ---- */
   infoNotes: [
-    '☀️ <b>Valitse matkapäivät Vaihtoehdot-välilehdeltä.</b> Sovellus järjestää 2 päivän lenkkivaihtoehdot tuoreen sääennusteen mukaan ja korostaa parhaan Brändö-päivän. Brändö-päivä voi olla vain ke, to, pe tai su (Skiftet-lautan päivät).',
+    '☀️ <b>Valitse matkapäivät Vaihtoehdot-välilehdeltä.</b> Sovellus järjestää 2 päivän lenkkivaihtoehdot tuoreen sääennusteen mukaan ja korostaa parhaan Brändö-päivän. Brändö-päivä voi olla vain ke, to, pe tai su (Houtskärin reitin päivät).',
     '🚲 Koko lenkki ~120 km, josta pyöräillen ~69 km — loput meritse lautoilla. Sähköpyörällä (~20 km/h) ja 15 min tauko/tunti pyöräaikaa ~3,5 h. Toinen päivä on selvästi pidempi (Brändö-osuus ~48 km). Maasto on loivaa.',
     '🚗 Autolla Turusta Kustaviin (~1 h); jätä auto Peterzens\'ille (reissun tukikohta). Aja perille matkan ensimmäisenä aamuna ja aloita lenkki sieltä; paluu autolla viimeisen päivän jälkeen.',
-    '🎟️ Varaa lautat etukäteen: <b>Skiftet</b> (Brändö↔Houtskär) viimeistään edellisenä päivänä klo 17, ja <b>Ådan</b> (Osnäs↔Åva) — molemmat vaativat varauksen. <b>Replot</b> (Mossala↔Dalen) on hyvä varata sekin. <b>Sterna</b> (Heponiemi↔Kannvik) on ilmainen eikä vaadi varausta.',
-    '⚠️ Skiftet-lautta (Brändö↔Houtskär, m/s Rosala 2) liikennöi <b>vain ke, to, pe ja su</b> — ei ma, ti eikä la. Ylitys ~2–2,5 h. Juhannuksena (pe 19.6. & la 20.6.) ei liikennettä.',
+    '🎟️ Varaa lautat etukäteen: <b>Houtskärin reitti</b> (Brändö↔Houtskär, m/s Rosala 2) viimeistään edellisenä päivänä klo 17, ja <b>Ådan</b> (Osnäs↔Åva) — molemmat vaativat varauksen. <b>Replot 2</b> (Mossala↔Dalen) on hyvä varata sekin. <b>Sterna</b> (Heponiemi↔Kannvik) on ilmainen eikä vaadi varausta.',
+    '⚠️ Houtskärin reitin yhteysalus (Brändö↔Houtskär, m/s Rosala 2) liikennöi <b>vain ke, to, pe ja su</b> — ei ma, ti eikä la. Ylitys ~2–2,5 h. Juhannuksena (pe 19.6. & la 20.6.) ei liikennettä.',
     '🌬️ Tarkista tuuli ennen lähtöä — saaristossa vastatuuli avoimilla pätkillä on isoin rasitus. Tuulen suunta ja nopeus näkyvät Sää-välilehdellä (Ilmatieteen laitoksen ennuste).',
     '🌧️ Sadetutka: Kartta-välilehdellä 🌧️-painike näyttää edellisen tunnin sadealueet animaationa (Ilmatieteen laitoksen tutkadata). Mitä punaisempi, sitä rankempi sade. Vaatii verkkoyhteyden.',
     '💧 Ota mukaan vettä ja eväitä; palvelut ovat saarilla harvassa. Näsbyssä ja Mossalassa on ravintolat, Kustavissa kauppa.',
@@ -192,9 +192,9 @@ window.TRIP = {
 
   /* ---- Sources & things to verify ---- */
   dataGaps: [
-    'Skiftet (Brändö↔Houtskär) on reissun kriittisin yhteys: liikennöi vain ke/to/pe/su, varaus pakollinen viimeistään edellisenä päivänä klo 17 (su-vuorot la klo 14). Vahvista täsmäajat Finferriesin PDF:stä.',
+    'Houtskärin reitti (Brändö↔Houtskär, m/s Rosala 2) on reissun kriittisin yhteys: liikennöi vain ke/to/pe/su, varaus pakollinen viimeistään edellisenä päivänä klo 17 (su-vuorot la klo 14). Vahvista täsmäajat Finferriesin PDF:stä.',
     'Ådan (Osnäs↔Åva): varaus pakollinen — vahvista täsmäaika ja varaa alandstrafiken.ax. Suunta Åva→Osnäs (mantereelle) on maksuton.',
-    'Replot (Mossala→Dalen) ja Sterna (Kannvik→Heponiemi): ajat vahvistettu Finferriesin 2026 PDF:istä, mutta tarkista poikkeukset ennen matkaa.',
+    'Replot 2 (Mossala→Dalen) ja Sterna (Kannvik→Heponiemi): ajat vahvistettu Finferriesin 2026 PDF:istä, mutta tarkista poikkeukset ennen matkaa.',
     'Kaapelilossit (Skagen–Jumo, Björkö–Mossala, Roslax–Kivimo) kulkevat tarvittaessa ilman kiinteää aikataulua.',
     'Joidenkin pienten paikkojen (Brändön kirkonkylä, Kivimo) koordinaatit ovat likimääräisiä.'
   ],
@@ -202,7 +202,7 @@ window.TRIP = {
     { label: 'Brändö: saaristolauttojen info & aikataulut', url: 'https://www.brando.ax/info-ja-aikataulut-saaristolautoille/' },
     { label: 'Tour de Skiftet -reitti (brando.ax)', url: 'https://www.brando.ax/tour-de-skiftet-2026-fi/' },
     { label: 'Ådan (Osnäs–Åva) aikataulu & varaus', url: 'https://www.alandstrafiken.ax/farjetrafik/farjornas-turlistor' },
-    { label: 'Finferries: Houtskärin reitti (Skiftet) PDF', url: 'https://www.finferries.fi/media/aikataulut-2026/houtskarin-reitti-kesa-6.6.-18.8.2026.pdf' },
+    { label: 'Finferries: Houtskärin reitti (m/s Rosala 2) PDF', url: 'https://www.finferries.fi/media/aikataulut-2026/houtskarin-reitti-kesa-6.6.-18.8.2026.pdf' },
     { label: 'Finferries: Mossala–Dalen PDF', url: 'https://www.finferries.fi/media/aikataulut-2026/saariston-rengastie-houtskari-inio-8.5.-13.9.2026.pdf' },
     { label: 'Finferries: Iniö–Kustavi (Sterna) PDF', url: 'https://www.finferries.fi/media/aikataulut-2026/inio-kustavi-kesa-8.5.-13.9.2026.pdf' },
     { label: 'Saariston Rengastie / Tour de Skiftet', url: 'https://www.rengastie.fi/tour-de-skiftet/' },
