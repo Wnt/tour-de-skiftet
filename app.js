@@ -631,7 +631,7 @@
       else if (window._map) setTimeout(function () { window._map.invalidateSize(); }, 60);
     }
     if (name === 'weather') ensureWeather();
-    if (name === 'options') ensureOptions();
+    if (name === 'options') { ensureOptions(); setTimeout(scrollOptionsToTarget, 60); }
   }
   tabs.forEach(function (t) {
     t.addEventListener('click', function () { showView(t.getAttribute('data-view')); });
@@ -1172,6 +1172,8 @@
     });
   }
   function dateFromKey(k) { var p = k.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function keyOf(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function todayKeyLocal() { var t = new Date(); t.setHours(0, 0, 0, 0); return keyOf(t); }
 
   function scoreOption(brWx, iniWx) {
     return brWx.pop * 1.0 + brWx.precip * 15 + brWx.windMax * 1.5
@@ -1246,88 +1248,136 @@
     setFerryFilterToDate(opt.d1key);
     buildFerries();
 
-    // Mark selected option card
+    // Mark selected option card (only for an explicit user choice, not a soft auto-default)
     document.querySelectorAll('.opt-card').forEach(function (c) { c.classList.remove('opt-card--selected'); });
     document.querySelectorAll('.opt-choose').forEach(function (btn) {
       btn.textContent = 'Valitse tämä';
       btn.disabled = false;
     });
-    // Find matching card by data attribute
-    var selCard = document.querySelector('.opt-card[data-d1key="' + opt.d1key + '"][data-dir="' + dir + '"]');
-    if (selCard) {
-      selCard.classList.add('opt-card--selected');
-      var btn = selCard.querySelector('.opt-choose');
-      if (btn) { btn.textContent = 'Valittu ✓'; btn.disabled = true; }
+    if (!noPersist) {
+      var selCard = document.querySelector('.opt-card[data-d1key="' + opt.d1key + '"][data-dir="' + dir + '"]');
+      if (selCard) {
+        selCard.classList.add('opt-card--selected');
+        var btn = selCard.querySelector('.opt-choose');
+        if (btn) { btn.textContent = 'Valittu ✓'; btn.disabled = true; }
+      }
     }
 
     // Navigate to route view (unless noNav)
     if (!noNav) showView('route');
   }
 
+  function bestOption(options) {
+    var best = null;
+    (options || []).forEach(function (o) {
+      if (o.status === 'ok' && o.brWx && o.iniWx && o.score < (best ? best.score : Infinity)) best = o;
+    });
+    return best;
+  }
+
+  function renderOptionCard(opt, best) {
+    var dirIcon = opt.direction === 'cw' ? '⟳' : '⟲';
+    var dirName = opt.direction === 'cw' ? 'Myötäpäivään' : 'Vastapäivään';
+    var dirSub = opt.direction === 'cw' ? 'Pv 1: Iniö · Pv 2: Brändö ⚓' : 'Pv 1: Brändö ⚓ · Pv 2: Iniö';
+    var headHtml = '<div class="opt-card__dir"><span class="opt-dir-icon">' + dirIcon + '</span>' +
+      '<div><div class="opt-dir-name">' + dirName + '</div><div class="opt-dir-sub">' + dirSub + '</div></div></div>';
+
+    // INACTIVE — past day
+    if (opt.status === 'past') {
+      var pc = el('div', 'opt-card opt-card--inactive');
+      pc.innerHTML = '<div class="opt-card__head">' + headHtml + '</div><div class="opt-inactive-reason">⏳ Mennyt päivä.</div>';
+      return pc;
+    }
+    // INACTIVE — Skiftet does not run on the Brändö day
+    if (opt.status === 'noFerry') {
+      var brWd = WEEKDAYS_FI_LONG[dateFromKey(opt.brandoKey).getDay()].toLowerCase();
+      var nc = el('div', 'opt-card opt-card--inactive');
+      nc.innerHTML = '<div class="opt-card__head">' + headHtml + '</div>' +
+        '<div class="opt-inactive-reason">⚓ Skiftet-lautta ei liikennöi ' + brWd + 'na (Brändö-päivä) — Brändö–Houtskär-yhteyttä ei tähän suuntaan ole.</div>';
+      var link = el('a', 'opt-sched-link', 'Skiftetin aikataulu →');
+      link.href = 'javascript:void(0)';
+      link.addEventListener('click', function (e) { e.preventDefault(); openFerrySchedule('skiftet', opt.brandoKey); });
+      nc.appendChild(link);
+      return nc;
+    }
+
+    // ACTIVE
+    var isBest = !!(best && best.direction === opt.direction && best.d1key === opt.d1key && best.d2key === opt.d2key);
+    var isSelected = SELECTED && !autoDefault && SELECTED.direction === opt.direction &&
+      SELECTED.d1key === opt.d1key && SELECTED.d2key === opt.d2key;
+    var card = el('div', 'opt-card' + (isBest ? ' opt-card--best' : '') + (isSelected ? ' opt-card--selected' : ''));
+    card.setAttribute('data-dir', opt.direction);
+    card.setAttribute('data-d1key', opt.d1key);
+    var badge = isBest ? '<span class="opt-best-badge">⭐ Paras sää</span>' : '';
+    var head = el('div', 'opt-card__head');
+    head.innerHTML = headHtml + badge;
+    card.appendChild(head);
+
+    var body = el('div', 'opt-card__body');
+    if (opt.brWx && opt.iniWx) {
+      if (opt.direction === 'cw') {
+        body.appendChild(renderDayStrip(opt.iniWx, 'Päivä 1 · Iniö', false));
+        body.appendChild(renderDayStrip(opt.brWx, 'Päivä 2 · Brändö ⚓', true));
+      } else {
+        body.appendChild(renderDayStrip(opt.brWx, 'Päivä 1 · Brändö ⚓', true));
+        body.appendChild(renderDayStrip(opt.iniWx, 'Päivä 2 · Iniö', false));
+      }
+      body.appendChild(el('div', 'opt-verdict', '<b>Brändö-päivä:</b> ' + brandoVerdict(opt.brWx)));
+    } else {
+      body.appendChild(el('div', 'opt-verdict', 'Sääennuste ei kata näitä päiviä vielä — valittavissa silti.'));
+    }
+    var chooseBtn = el('button', 'opt-choose pill-btn', isSelected ? 'Valittu ✓' : 'Valitse tämä');
+    if (isSelected) chooseBtn.disabled = true;
+    (function (o) {
+      chooseBtn.addEventListener('click', function () { applyOption({ direction: o.direction, d1key: o.d1key, d2key: o.d2key }, false, false); });
+    }(opt));
+    body.appendChild(chooseBtn);
+    card.appendChild(body);
+    return card;
+  }
+
   function buildOptionsUI(options, ts) {
     var wrap = $('#optionsList');
     wrap.innerHTML = '';
-
     if (!options || !options.length) {
-      wrap.innerHTML = '<p class="muted">Ei sopivia vaihtoehtoja ennustejaksolla (Skiftet ei liikennöi ma tai la).</p>';
+      wrap.innerHTML = '<p class="muted">Sääennustetta ei ole vielä ladattu — yhdistä verkkoon.</p>';
       return;
     }
-
-    options.forEach(function (opt, idx) {
-      var isBest = idx === 0;
-      var isSelected = SELECTED && SELECTED.direction === opt.direction &&
-        SELECTED.d1key === opt.d1key && SELECTED.d2key === opt.d2key;
-      var cardCls = 'opt-card' + (isBest ? ' opt-card--best' : '') + (isSelected ? ' opt-card--selected' : '');
-      var card = el('div', cardCls);
-      card.setAttribute('data-dir', opt.direction);
-      card.setAttribute('data-d1key', opt.d1key);
-
-      var dirIcon = opt.direction === 'cw' ? '⟳' : '⟲';
-      var dirName = opt.direction === 'cw' ? 'Myötäpäivään' : 'Vastapäivään';
-      var dirSub = opt.direction === 'cw'
-        ? 'Pv 1: Iniö · Pv 2: Brändö (Skiftet-päivä)'
-        : 'Pv 1: Brändö (Skiftet-päivä) · Pv 2: Iniö';
-      var badge = isBest ? '<span class="opt-best-badge">⭐ Suositus</span>' : '';
-
-      var head = el('div', 'opt-card__head');
-      head.innerHTML =
-        '<div class="opt-card__dir"><span class="opt-dir-icon">' + dirIcon + '</span>' +
-        '<div><div class="opt-dir-name">' + dirName + '</div>' +
-        '<div class="opt-dir-sub">' + dirSub + '</div></div></div>' + badge;
-      card.appendChild(head);
-
-      var body = el('div', 'opt-card__body');
-
-      if (opt.direction === 'cw') {
-        body.appendChild(renderDayStrip(opt.iniWx, 'Päivä 1 · Iniö', false));
-        body.appendChild(renderDayStrip(opt.brWx,  'Päivä 2 · Brändö ⚓', true));
-      } else {
-        body.appendChild(renderDayStrip(opt.brWx,  'Päivä 1 · Brändö ⚓', true));
-        body.appendChild(renderDayStrip(opt.iniWx, 'Päivä 2 · Iniö', false));
-      }
-
-      var verdict = el('div', 'opt-verdict');
-      verdict.innerHTML = '<b>Brändö-päivä:</b> ' + brandoVerdict(opt.brWx);
-      body.appendChild(verdict);
-
-      // "Valitse" button
-      var chooseBtnText = isSelected ? 'Valittu ✓' : 'Valitse tämä';
-      var chooseBtn = el('button', 'opt-choose pill-btn', chooseBtnText);
-      if (isSelected) chooseBtn.disabled = true;
-      (function (capturedOpt) {
-        chooseBtn.addEventListener('click', function () { applyOption(capturedOpt, false); });
-      }(opt));
-      body.appendChild(chooseBtn);
-
-      card.appendChild(body);
-      wrap.appendChild(card);
+    var best = bestOption(options);
+    var tKey = todayKeyLocal();
+    // group by start day (already ascending), both directions per day
+    var groups = {}, order = [];
+    options.forEach(function (o) { if (!groups[o.d1key]) { groups[o.d1key] = []; order.push(o.d1key); } groups[o.d1key].push(o); });
+    order.forEach(function (dkey) {
+      var d1 = dateFromKey(dkey), d2 = new Date(d1.getTime() + 86400000);
+      var grp = el('div', 'opt-daygroup');
+      grp.setAttribute('data-daykey', dkey);
+      var isToday = dkey === tKey;
+      var label = WEEKDAYS_FI[d1.getDay()] + ' ' + d1.getDate() + '.' + (d1.getMonth() + 1) + '. → ' +
+        WEEKDAYS_FI[d2.getDay()] + ' ' + d2.getDate() + '.' + (d2.getMonth() + 1) + '.';
+      grp.appendChild(el('div', 'opt-daygroup__head' + (isToday ? ' opt-daygroup__head--today' : ''),
+        label + (isToday ? ' <span class="opt-today-tag">tänään</span>' : '')));
+      groups[dkey].forEach(function (o) { grp.appendChild(renderOptionCard(o, best)); });
+      wrap.appendChild(grp);
     });
-
     if (ts) {
       var dt = new Date(ts);
       $('#optionsUpdated').textContent = 'Päivitetty ' + pad(dt.getHours()) + ':' + pad(dt.getMinutes()) +
         ' · Ilmatieteen laitos' + (navigator.onLine ? '' : ' · offline');
     }
+    setTimeout(scrollOptionsToTarget, 0);
+  }
+
+  // Default: scroll so today's day-group is at the top; if the user has explicitly
+  // selected a (possibly earlier) day, scroll to that instead.
+  function scrollOptionsToTarget() {
+    var sp = document.querySelector('#view-options .scroll-pad');
+    if (!sp) return;
+    var key = (SELECTED && !autoDefault && SELECTED.d1key) ? SELECTED.d1key : todayKeyLocal();
+    var grp = sp.querySelector('.opt-daygroup[data-daykey="' + key + '"]');
+    if (!grp) grp = sp.querySelector('.opt-daygroup'); // fallback: first group
+    if (!grp) return;
+    sp.scrollTop += grp.getBoundingClientRect().top - sp.getBoundingClientRect().top;
   }
 
   function computeOptions(wxData) {
@@ -1343,51 +1393,42 @@
     if (!kannvikDot && avail.length >= 2) kannvikDot = avail[1].sum;
     if (!avaDot || !kannvikDot) return [];
 
+    var brMap = {}, iniMap = {};
+    avaDot.days.forEach(function (d) { brMap[d.key] = d; });
+    kannvikDot.days.forEach(function (d) { iniMap[d.key] = d; });
+
     var today = new Date(); today.setHours(0, 0, 0, 0);
-    var avaDays = avaDot.days.filter(function (d) { return dateFromKey(d.key) >= today; });
-    var kannvikDays = kannvikDot.days.filter(function (d) { return dateFromKey(d.key) >= today; });
-
-    var iniMap = {};
-    kannvikDays.forEach(function (d) { iniMap[d.key] = d; });
-
-    var options = [];
-    for (var i = 0; i < avaDays.length - 1; i++) {
-      var d1wx = avaDays[i];
-      var d2wx = avaDays[i + 1];
-      var d1 = dateFromKey(d1wx.key);
-      var d2 = dateFromKey(d2wx.key);
-      var gap = (d2.getTime() - d1.getTime()) / 86400000;
-      if (gap !== 1) continue;
-
-      var iniD1 = iniMap[d1wx.key] || d1wx;
-      var iniD2 = iniMap[d2wx.key] || d2wx;
-
-      // CW: D1=Iniö, D2=Brändö. Skiftet runs D2.
-      if (skiftetRunsOn(d2)) {
-        options.push({
-          direction: 'cw', d1key: d1wx.key, d2key: d2wx.key,
-          brWx: d2wx, iniWx: iniD1,
-          score: scoreOption(d2wx, iniD1)
+    var opts = [];
+    // Chronological: from 3 days ago through ~forecast end; both directions per start day.
+    for (var off = -3; off <= 8; off++) {
+      var d1 = new Date(today.getTime() + off * 86400000);
+      var d2 = new Date(today.getTime() + (off + 1) * 86400000);
+      var d1key = keyOf(d1), d2key = keyOf(d2);
+      var past = d1.getTime() < today.getTime();
+      ['cw', 'ccw'].forEach(function (dir) {
+        var brandoDate = dir === 'cw' ? d2 : d1;
+        var brandoKey = dir === 'cw' ? d2key : d1key;
+        var iniKey = dir === 'cw' ? d1key : d2key;
+        var brWx = brMap[brandoKey] || null;
+        var iniWx = iniMap[iniKey] || null;
+        var ferryOk = skiftetRunsOn(brandoDate);
+        var status = past ? 'past' : (!ferryOk ? 'noFerry' : 'ok');
+        var score = (status === 'ok' && brWx && iniWx) ? scoreOption(brWx, iniWx) : Infinity;
+        opts.push({
+          direction: dir, d1key: d1key, d2key: d2key, brandoKey: brandoKey,
+          brWx: brWx, iniWx: iniWx, status: status, score: score
         });
-      }
-      // CCW: D1=Brändö, D2=Iniö. Skiftet runs D1.
-      if (skiftetRunsOn(d1)) {
-        options.push({
-          direction: 'ccw', d1key: d1wx.key, d2key: d2wx.key,
-          brWx: d1wx, iniWx: iniD2,
-          score: scoreOption(d1wx, iniD2)
-        });
-      }
+      });
     }
-
-    options.sort(function (a, b) { return a.score - b.score; });
-    return options;
+    return opts;
   }
 
   // If the user has not explicitly chosen, apply the top-ranked option as a soft
   // default so Reitti/Sää/Lautat show a valid, weather-optimal plan automatically.
   function maybeAutoDefault(opts) {
-    if ((!SELECTED || autoDefault) && opts && opts.length) applyOption(opts[0], true, true);
+    if (SELECTED && !autoDefault) return; // explicit user choice — keep it
+    var best = bestOption(opts);
+    if (best) applyOption({ direction: best.direction, d1key: best.d1key, d2key: best.d2key }, true, true);
   }
 
   function ensureOptions(force) {

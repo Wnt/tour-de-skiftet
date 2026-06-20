@@ -685,3 +685,35 @@ h1, h2, h3, p { margin: 0; }
   margin: 4px 0 8px;
 }
 .a2hs-toast__close:hover { background: var(--bg); }
+
+/* Vaihtoehdot: chronological day groups + inactive boxes */
+.opt-daygroup { margin: 0 0 18px; }
+.opt-daygroup__head {
+  font-size: .8rem; font-weight: 800; color: var(--teal-dark);
+  padding: 6px 2px 8px; margin-top: 6px;
+  border-bottom: 2px solid var(--line);
+  position: sticky; top: 0; background: var(--bg); z-index: 2;
+  display: flex; align-items: center; gap: 8px;
+}
+.opt-daygroup__head--today { color: var(--teal); border-bottom-color: var(--teal); }
+.opt-today-tag {
+  font-size: .66rem; font-weight: 800; color: #fff; background: var(--teal);
+  border-radius: 999px; padding: 2px 8px; white-space: nowrap;
+}
+.opt-daygroup .opt-card { margin-top: 10px; }
+
+.opt-card--inactive {
+  background: #f4f6f7; border-style: dashed; box-shadow: none; opacity: .9;
+}
+.opt-card--inactive .opt-card__head { background: #eceff0; border-bottom-color: var(--line); }
+.opt-card--inactive .opt-dir-name,
+.opt-card--inactive .opt-dir-icon { color: var(--muted); }
+.opt-inactive-reason {
+  padding: 10px 14px; font-size: .82rem; color: var(--muted); line-height: 1.4;
+}
+.opt-sched-link {
+  display: inline-block; margin: 0 14px 12px; font-size: .8rem; font-weight: 700;
+  color: var(--ferry); text-decoration: none; padding: 5px 10px;
+  border: 1px solid var(--line); border-radius: 999px; background: #fff;
+}
+.opt-sched-link:active { opacity: .7; }
