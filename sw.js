@@ -4,7 +4,7 @@
    - Map tiles (OpenStreetMap): cache-first, stored as viewed -> available offline afterwards (capped).
    - Weather API (Open-Meteo): network-first, falls back to last cached response. */
 
-const VERSION = 'skiftet-v13';
+const VERSION = 'skiftet-v14';
 const SHELL_CACHE = `${VERSION}-shell`;
 const TILE_CACHE = `${VERSION}-tiles`;
 const API_CACHE = `${VERSION}-api`;
