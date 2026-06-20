@@ -18,7 +18,8 @@ window.TRIP = {
     lootholma:   { name: 'Kustavin Lootholma', island: 'Kustavi (Kivimaa)', type: 'accommodation', lat: 60.5293, lon: 21.3701 },
     heponiemi:   { name: 'Heponiemi (lauttaranta)', island: 'Kustavi', type: 'ferryTerminal', lat: 60.4851, lon: 21.4351 },
     kivimaa:     { name: 'Kivimaa (Kustavin keskusta)', island: 'Kustavi', type: 'town', lat: 60.5449, lon: 21.3556 },
-    vartsala:    { name: 'Vartsala', island: 'Kustavi', type: 'village', lat: 60.5360, lon: 21.3008 },
+    vartsala:    { name: 'Vartsala (lossiranta)', island: 'Kustavi', type: 'ferryTerminal', lat: 60.5410, lon: 21.3195 },
+    vartsala_e:  { name: 'Kivimaan lossiranta', island: 'Kustavi', type: 'ferryTerminal', lat: 60.5426, lon: 21.3360 },
     osnas:       { name: 'Osnäs / Vuosnainen (lauttaranta)', island: 'Kustavi', type: 'ferryTerminal', lat: 60.5074, lon: 21.2474 },
     ava:         { name: 'Åva (lauttaranta)', island: 'Brändö', type: 'ferryTerminal', lat: 60.5032, lon: 21.0572 },
     jurmo:       { name: 'Jurmo', island: 'Brändö', type: 'side', lat: 60.5169, lon: 21.0766 },
@@ -158,6 +159,18 @@ window.TRIP = {
       schedules: [
         { direction: 'Skagen ↔ Jumo', days: 'Tarvittaessa / päivittäin', dow: [0, 1, 2, 3, 4, 5, 6], season: 'Kesä', times: [] }
       ]
+    },
+    vartsala: {
+      name: 'Vartsalan lossi',
+      operator: 'Väylä · maantielossi',
+      crossingMin: 8,
+      booking: 'no',
+      price: 'Maksuton (valtion maantielossi).',
+      note: 'Pieni maantielossi Vartsalan salmen yli (Osnäs ↔ Kivimaa). Kulkee jatkuvasti, ei kiinteää aikataulua eikä varausta — aja kyytiin rannassa.',
+      links: [],
+      schedules: [
+        { direction: 'Vartsala ↔ Kivimaa', days: 'Jatkuvasti / päivittäin', dow: [0, 1, 2, 3, 4, 5, 6], season: 'Kesä', times: [] }
+      ]
     }
   },
 
@@ -179,9 +192,11 @@ window.TRIP = {
   bases: {
     peterzens: {
       key: 'peterzens', label: 'Peterzens', placeKey: 'peterzens',
-      dayKm: '26 + 47 km', balance: 'epätasainen',
+      dayKm: '26 + 45 km', balance: 'epätasainen',
       toHeponiemi: [ { from: 'peterzens', to: 'heponiemi', mode: 'bike', km: 1.3 } ],
-      osnasToBase: [ { from: 'osnas', to: 'kivimaa', mode: 'bike', km: 9.5 },
+      osnasToBase: [ { from: 'osnas', to: 'vartsala', mode: 'bike', km: 6.4 },
+                     { from: 'vartsala', to: 'vartsala_e', mode: 'ferry', km: 0.9, ferry: 'vartsala' },
+                     { from: 'vartsala_e', to: 'kivimaa', mode: 'bike', km: 1.3 },
                      { from: 'kivimaa', to: 'peterzens', mode: 'bike', km: 11.4 } ],
       accommodation: {
         name: 'Peterzens Boathouse', address: 'Parattulan rantatie 16, 23360 Kustavi',
@@ -192,13 +207,15 @@ window.TRIP = {
     },
     lootholma: {
       key: 'lootholma', label: 'Lootholma', placeKey: 'lootholma',
-      dayKm: '39 + 37 km', balance: 'tasainen',
+      dayKm: '39 + 36 km', balance: 'tasainen',
       toHeponiemi: [ { from: 'lootholma', to: 'heponiemi', mode: 'bike', km: 13.8 } ],
-      osnasToBase: [ { from: 'osnas', to: 'lootholma', mode: 'bike', km: 10.5 } ],
+      osnasToBase: [ { from: 'osnas', to: 'vartsala', mode: 'bike', km: 6.4 },
+                     { from: 'vartsala', to: 'vartsala_e', mode: 'ferry', km: 0.9, ferry: 'vartsala' },
+                     { from: 'vartsala_e', to: 'lootholma', mode: 'bike', km: 3.3 } ],
       accommodation: {
         name: 'Kustavin Lootholma', address: 'Kuninkaantie 193, 23360 Kustavi',
         lat: 60.5293, lon: 21.3701, link: 'https://lootholma.fi', bookingUrl: null,
-        note: 'Kustavi (Kivimaa) — leirintä, mökit ja ravintola. Keskeinen sijainti tasaa päivien ajomatkat (~39 + 37 km lähtöpäivien sijaan 26 + 47 km). Lähellä keskustaa ja palveluita.'
+        note: 'Kustavi (Kivimaa) — leirintä, mökit ja ravintola. Keskeinen sijainti tasaa päivien ajomatkat (~39 + 36 km, kun Peterzensistä 26 + 45 km). Lähellä keskustaa ja palveluita.'
       }
     }
   },

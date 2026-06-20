@@ -141,20 +141,16 @@
     'torsholma>roslax': 'Houtskärin reitti ~2 h (m/s Rosala 2) — varaa jo ennen matkaa, edellisiltana klo 17 (su: la klo 14)'
   };
   // Direction- & base-aware note for a leg; undefined keeps the canonical note.
-  // (Cable ferries crossed on a leg are shown as their own chips, not in the note.)
+  // The base appears only at the trip's very first leg (departure) and very last (arrival).
   function directionalNote(from, to, base) {
-    if (from === base && to === 'heponiemi') return 'Lauttarantaan — retki alkaa';
-    if (from === 'heponiemi' && to === base) return 'Takaisin lähtöpisteeseen — matka päättyy';
-    if (from === base && (to === 'kivimaa' || to === 'osnas')) return 'Kohti Osnäsin lauttaa — retki alkaa';
-    if ((from === 'kivimaa' || from === 'osnas') && to === base) return 'Takaisin lähtöpisteeseen — matka päättyy';
+    if (from === base) return (to === 'heponiemi') ? 'Lauttarantaan — retki alkaa' : 'Kohti Osnäsin lauttaa — retki alkaa';
+    if (to === base) return 'Takaisin lähtöpisteeseen — matka päättyy';
     return FIXED_DIR_NOTES[from + '>' + to];
   }
 
   // Road cable ferries (lossi) crossed DURING a bike leg — shown as visible chips.
-  // Keyed by the leg's two places, sorted and joined with "|".
+  // (Vartsala is its own ferry leg now, so it is not listed here.)
   var CABLE_FERRIES_BY_LEG = {
-    'kivimaa|osnas':   [{ name: 'Vartsalan lossi', note: 'maksuton · kulkee tarvittaessa' }],
-    'lootholma|osnas': [{ name: 'Vartsalan lossi', note: 'maksuton · kulkee tarvittaessa' }],
     'mossala|nasby':   [{ name: 'Mossala–Björkö lossi', note: 'maksuton · kulkee tarvittaessa' },
                         { name: 'Kivimo–Roslax lossi', note: 'maksuton · kulkee tarvittaessa' }]
   };
