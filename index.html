@@ -27,7 +27,7 @@
 
   <main class="app-main">
     <!-- MAP -->
-    <section id="view-map" class="view" aria-label="Kartta">
+    <section id="view-map" class="view" role="tabpanel" aria-labelledby="tab-map" aria-label="Kartta">
       <div id="map"></div>
       <div class="map-controls">
         <button id="radarBtn" class="map-btn" title="Sadetutka päälle/pois">🌧️</button>
@@ -46,7 +46,7 @@
     </section>
 
     <!-- ROUTE / ITINERARY -->
-    <section id="view-route" class="view" aria-label="Reitti">
+    <section id="view-route" class="view" role="tabpanel" aria-labelledby="tab-route" aria-label="Reitti">
       <div class="scroll-pad">
         <div class="summary-bar" id="routeSummary"></div>
         <h2 class="section-title section-title--flush" id="routeTitle">Reitti vaiheittain</h2>
@@ -55,7 +55,7 @@
     </section>
 
     <!-- FERRIES -->
-    <section id="view-ferries" class="view" aria-label="Lautat">
+    <section id="view-ferries" class="view" role="tabpanel" aria-labelledby="tab-ferries" aria-label="Lautat">
       <div class="scroll-pad">
         <div class="info-callout">
           ⚓ Monet saariston yhteysalukset vaativat <b>ennakkovarauksen</b>. Tarkista ajat aina operaattorilta ennen lähtöä — aikataulut voivat muuttua.
@@ -69,7 +69,7 @@
     </section>
 
     <!-- WEATHER -->
-    <section id="view-weather" class="view" aria-label="Sää">
+    <section id="view-weather" class="view" role="tabpanel" aria-labelledby="tab-weather" aria-label="Sää">
       <div class="scroll-pad">
         <div class="weather-head">
           <div>
@@ -84,7 +84,7 @@
     </section>
 
     <!-- OPTIONS -->
-    <section id="view-options" class="view view--active" aria-label="Vaihtoehdot">
+    <section id="view-options" class="view view--active" role="tabpanel" aria-labelledby="tab-options" aria-label="Vaihtoehdot">
       <div class="scroll-pad">
         <div class="weather-head">
           <div>
@@ -99,7 +99,7 @@
     </section>
 
     <!-- INFO -->
-    <section id="view-info" class="view" aria-label="Info">
+    <section id="view-info" class="view" role="tabpanel" aria-labelledby="tab-info" aria-label="Info">
       <div class="scroll-pad">
         <h2 class="section-title section-title--flush">Majoitus</h2>
         <div id="lodgingList" class="lodging-list"></div>
@@ -112,13 +112,13 @@
     </section>
   </main>
 
-  <nav class="tabbar" role="tablist">
-    <button class="tab tab--active" data-view="options"><span class="tab__icon">⚖️</span><span class="tab__label">Vaihtoehdot</span></button>
-    <button class="tab" data-view="route"><span class="tab__icon">🚲</span><span class="tab__label">Reitti</span></button>
-    <button class="tab" data-view="ferries"><span class="tab__icon">⛴️</span><span class="tab__label">Lautat</span></button>
-    <button class="tab" data-view="weather"><span class="tab__icon">🌤️</span><span class="tab__label">Sää</span></button>
-    <button class="tab" data-view="map"><span class="tab__icon">🗺️</span><span class="tab__label">Kartta</span></button>
-    <button class="tab" data-view="info"><span class="tab__icon">ℹ️</span><span class="tab__label">Info</span></button>
+  <nav class="tabbar" role="tablist" aria-label="Näkymät">
+    <button class="tab tab--active" data-view="options" id="tab-options" role="tab" aria-controls="view-options" aria-selected="true"><span class="tab__icon">⚖️</span><span class="tab__label">Vaihtoehdot</span></button>
+    <button class="tab" data-view="route" id="tab-route" role="tab" aria-controls="view-route" aria-selected="false"><span class="tab__icon">🚲</span><span class="tab__label">Reitti</span></button>
+    <button class="tab" data-view="ferries" id="tab-ferries" role="tab" aria-controls="view-ferries" aria-selected="false"><span class="tab__icon">⛴️</span><span class="tab__label">Lautat</span></button>
+    <button class="tab" data-view="weather" id="tab-weather" role="tab" aria-controls="view-weather" aria-selected="false"><span class="tab__icon">🌤️</span><span class="tab__label">Sää</span></button>
+    <button class="tab" data-view="map" id="tab-map" role="tab" aria-controls="view-map" aria-selected="false"><span class="tab__icon">🗺️</span><span class="tab__label">Kartta</span></button>
+    <button class="tab" data-view="info" id="tab-info" role="tab" aria-controls="view-info" aria-selected="false"><span class="tab__icon">ℹ️</span><span class="tab__label">Info</span></button>
   </nav>
 
   <div id="a2hsToast" class="a2hs-toast hidden" role="status" aria-live="polite">

@@ -68,6 +68,8 @@ window.TRIP = {
       operator: 'Ålandstrafiken · M/S Ådan',
       crossingMin: 45,
       booking: 'yes',
+      bookingUrl: 'https://boka.alandstrafiken.ax',
+      bookingProvider: 'Ålandstrafiken',
       price: 'Maksullinen suuntaan Osnäs→Åva (pyörä 4,80 € verkossa / 6 €, matkustaja ilman ajoneuvoa maksuton). Paluusuunta Åva→Osnäs maksuton.',
       note: 'VARAUS PAKOLLINEN — ilman ennakkolippua ei pääse laivaan. Kesäaikataulu 6.6.–18.8.2026. Vahvista ajat ja varaa: alandstrafiken.ax tai +358 18 25 600.',
       links: [
@@ -88,6 +90,8 @@ window.TRIP = {
       operator: 'Finferries · m/s Rosala 2',
       crossingMin: 135,
       booking: 'yes',
+      bookingUrl: 'https://booking.finferries.fi',
+      bookingProvider: 'Finferries',
       price: 'Maksuton matkustajalle ja pyörälle.',
       note: 'VARAUS PAKOLLINEN viimeistään edellisenä päivänä klo 17 (su-vuorot la klo 14 mennessä) — booking.finferries.fi. Liikennöi VAIN ke, to, pe ja su — ei ma, ti eikä la. Pitkä ulkosaaristoylitys ~2–2,5 h, useita pysähdyksiä. Juhannus: pe 19.6. ja la 20.6. ei liikennettä.',
       links: [
@@ -108,6 +112,8 @@ window.TRIP = {
       operator: 'Finferries · M/S Replot 2',
       crossingMin: 60,
       booking: 'recommended',
+      bookingUrl: 'https://booking.finferries.fi',
+      bookingProvider: 'Finferries',
       price: 'Maksullinen: aikuinen 10 €, lapsi 5 €, polkupyörä 12 €, henkilöauto 45 €.',
       note: 'Liikennöi kesäkaudella 8.5.–13.9.2026. Varaus suositeltu paikan varmistamiseksi (booking.finferries.fi tai maksu kyydissä MobilePaylla). Heinäkuun ilta­vuorot (18:45 / 20:00) eivät kulje kesäkuussa.',
       links: [
@@ -159,11 +165,13 @@ window.TRIP = {
     {
       night: 1, name: 'Restaurang Sybarit & Bed and Breakfast', address: 'Näsbyvägen 189, 21760 Houtskär',
       lat: 60.2228, lon: 21.3685, link: 'https://www.bedandbreakfast.eu/en/a/XvTueNhFQ4O8/bed-breakfast-restaurang-sybarit',
+      bookingUrl: 'https://www.booking.com/hotel/fi/bed-amp-breakfast-restaurang-sybarit.html',
       note: 'Yö 1 · Houtskär (Näsby), ~200 m vierasvenesatamasta. Ravintola samassa.'
     },
     {
       night: 2, name: 'Peterzens Boathouse', address: 'Parattulan rantatie 16, 23360 Kustavi',
       lat: 60.4950, lon: 21.4400, link: 'https://peterzens.com',
+      bookingUrl: 'https://www.booking.com/hotel/fi/peterzens-boathouse.html',
       note: 'Yö 2 · Kustavi, reissun tukikohta — jätä auto tänne ja aja kotiin lopuksi. Laupusten niemellä, ~500 m Heponiemen lauttarannasta. (Huom: ei Brändöllä/Lapolla.)'
     }
   ],

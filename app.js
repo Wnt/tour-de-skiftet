@@ -552,11 +552,21 @@
       var prog = loadProgress();
       var dayProg = prog[dayObj.date] || {};
 
-      /* Pre-locate the index of the next ferry for each step (for too-late check) */
+      /* For the too-late check, find the next SCHEDULED ferry after a step.
+         On-demand ferries (no fixed departures) are skipped, but their crossing
+         time + the bike time in between is accumulated so the check is honest. */
       var steps = dayObj.steps || [];
-      function nextFerryAfter(idx) {
+      function nextScheduledFerryInfo(idx, baseArrival) {
+        var acc = baseArrival;
         for (var ni = idx + 1; ni < steps.length; ni++) {
-          if (steps[ni].type === 'ferry') return steps[ni];
+          var st = steps[ni];
+          if (st.type === 'bike') {
+            acc += rideMin(st.km);
+            if (st.km >= 40) acc += 15;
+          } else if (st.type === 'ferry') {
+            if (st.departures && st.departures.length) return { ferry: st, earliest: acc };
+            acc += st.crossingMin || 0; /* on-demand: add crossing, keep scanning */
+          }
         }
         return null;
       }
@@ -590,32 +600,43 @@
           body.appendChild(row);
 
         } else if (s.type === 'ferry') {
-          /* Too-late check — compute against next ferry's departures */
-          var nextFerry = nextFerryAfter(idx);
-          var tooLate = false;
-          if (s.chosenTime && nextFerry && nextFerry.departures.length) {
-            var bikeMinBetween = 0;
-            for (var bi = idx + 1; bi < steps.length; bi++) {
-              if (steps[bi] === nextFerry) break;
-              if (steps[bi].type === 'bike') {
-                bikeMinBetween += rideMin(steps[bi].km);
-                if (steps[bi].km >= 40) bikeMinBetween += 15;
+          /* Too-late check — does the chosen departure still make the next
+             SCHEDULED ferry's last departure? (skips on-demand intermediaries) */
+          var tlInfo = null;
+          if (s.chosenTime) {
+            var nsf = nextScheduledFerryInfo(idx, minutesOf(s.chosenTime) + s.crossingMin);
+            if (nsf) {
+              var lastNextDep = nsf.ferry.departures[nsf.ferry.departures.length - 1].min;
+              if (nsf.earliest > lastNextDep) {
+                tlInfo = { from: nsf.ferry.from, to: nsf.ferry.to, lastDep: lastNextDep };
               }
             }
-            var arrivalAfterChosen = minutesOf(s.chosenTime) + s.crossingMin;
-            var earliestNextDep = arrivalAfterChosen + bikeMinBetween;
-            var lastNextDep = nextFerry.departures[nextFerry.departures.length - 1].min;
-            if (earliestNextDep > lastNextDep) tooLate = true;
           }
 
-          body.appendChild(renderFerryStep(s, dayObj.date, dayProg, tooLate));
+          body.appendChild(renderFerryStep(s, dayObj.date, dayProg, tlInfo));
         }
       });
 
-      /* Overnight box */
+      /* Overnight box (with a date-prefilled Booking.com link) */
       if (dayObj.overnight) {
-        body.appendChild(el('div', 'day-card__overnight',
-          '🛏 Yöpyminen: <b>' + dayObj.overnight + '</b>'));
+        var ovBox = el('div', 'day-card__overnight');
+        ovBox.innerHTML = '🛏 Yöpyminen: <b>' + dayObj.overnight + '</b>';
+        var acc = (T.accommodations || []).filter(function (a) { return a.night === dayObj.day; })[0];
+        if (acc && acc.bookingUrl) {
+          var ci = dayObj.date, co;
+          if (dayObj.day === 1 && T.dayPlan[1] && T.dayPlan[1].date) {
+            co = T.dayPlan[1].date;
+          } else {
+            var cod = isoToDate(dayObj.date); cod.setDate(cod.getDate() + 1);
+            co = cod.getFullYear() + '-' + pad(cod.getMonth() + 1) + '-' + pad(cod.getDate());
+          }
+          var bUrl = acc.bookingUrl + '?checkin=' + ci + '&checkout=' + co + '&group_adults=2&no_rooms=1';
+          var bLink = el('a', 'day-card__book-link',
+            '🛏 Varaa Booking.comista (' + fmtDateFi(isoToDate(ci)) + '–' + fmtDateFi(isoToDate(co)) + ') →');
+          bLink.href = bUrl; bLink.target = '_blank'; bLink.rel = 'noopener';
+          ovBox.appendChild(bLink);
+        }
+        body.appendChild(ovBox);
       }
 
       card.appendChild(body);
@@ -627,25 +648,26 @@
   }
 
   /* ---------- renderFerryStep: render one ferry step block ---------- */
-  function renderFerryStep(s, dateKey, dayProg, tooLate) {
+  function renderFerryStep(s, dateKey, dayProg, tlInfo) {
     var confirmed = dayProg[s.ferryId] || null;
+    var tooLate = !!tlInfo;
 
     var blockCls = 'dp-ferry-block' + (tooLate ? ' dp-ferry-block--toolate' : '');
     var wrap = el('div', blockCls);
 
     /* Header row: icon + route + booking badge + Aikataulu link */
     var bookBadge = '';
-    if (s.booking === 'yes') bookBadge = ' <span class="dp-badge dp-badge--book">Varaus pakollinen</span>';
-    else if (s.booking === 'recommended') bookBadge = ' <span class="dp-badge dp-badge--book">Varaus suositeltu</span>';
+    if (s.booking === 'yes') bookBadge = ' <span class="badge badge--book">Varaus pakollinen</span>';
+    else if (s.booking === 'recommended') bookBadge = ' <span class="badge badge--book">Varaus suositeltu</span>';
 
     var head = el('div', 'dp-ferry-block__head');
     head.innerHTML =
-      '<span class="dp-ferry-icon">⛴</span>' +
+      '<span class="dp-ferry-icon">⛴️</span>' +
       '<div class="dp-ferry-route">' +
         '<span class="dp-ferry-from-to">' + displayName(s.from) + ' → ' + displayName(s.to) + '</span>' +
         bookBadge +
       '</div>' +
-      '<a class="dp-ferry-sched-link" href="javascript:void(0)" role="button">Aikataulu →</a>';
+      '<button type="button" class="dp-ferry-sched-link">Aikataulu →</button>';
 
     /* Wire Aikataulu link */
     head.querySelector('.dp-ferry-sched-link').addEventListener('click', function (e) {
@@ -664,10 +686,14 @@
       wrap.appendChild(el('div', 'dp-ferry-block__sub', s.note));
     }
 
-    /* Too-late warning banner */
-    if (tooLate) {
-      var warnText = '⚠️ Tällä vuorolla et ehdi seuraavaan lauttaan. Valitse aikaisempi vuoro.';
-      wrap.appendChild(el('div', 'dp-ferry-block__toolate', warnText));
+    /* Too-late warning banner (names the connection that would be missed) */
+    if (tlInfo) {
+      var missedName = displayName(tlInfo.from) + ' → ' + displayName(tlInfo.to);
+      var warnText = '⚠️ Tällä vuorolla et ehdi jatkoyhteyteen ' + missedName +
+        ' — sen viimeinen lähtö on klo ' + hhmm(tlInfo.lastDep) + '. Valitse aikaisempi vuoro.';
+      var banner = el('div', 'dp-ferry-block__toolate', warnText);
+      banner.setAttribute('role', 'alert');
+      wrap.appendChild(banner);
     }
 
     /* On-demand ferry */
@@ -675,8 +701,8 @@
       wrap.appendChild(el('div', 'dp-ferry-block__ondemand',
         '⏱ Kulkee tarvittaessa — ei kiinteää aikataulua'));
       if (confirmed) {
-        var confRow = el('div', 'dp-ferry-block__confirmed');
-        confRow.innerHTML = '✓ klo <b>' + confirmed + '</b>';
+        var confRow = el('div', 'dp-ferry-block__confirmed' + (tooLate ? ' dp-ferry-block__confirmed--toolate' : ''));
+        confRow.innerHTML = (tooLate ? '⚠️' : '✓') + ' klo <b>' + confirmed + '</b>' + (tooLate ? ' — et ehdi jatkoon' : '');
         var clrBtn = el('button', 'dp-clear-btn', 'nollaa');
         (function (dKey, fId) {
           clrBtn.addEventListener('click', function () { clearDeparture(dKey, fId); });
@@ -708,9 +734,10 @@
 
     /* Confirmed departure: compact confirmed bar + nollaa */
     if (confirmed) {
-      var confBar = el('div', 'dp-ferry-block__confirmed');
+      var confBar = el('div', 'dp-ferry-block__confirmed' + (tooLate ? ' dp-ferry-block__confirmed--toolate' : ''));
       var arrMin = minutesOf(confirmed) + s.crossingMin;
-      confBar.innerHTML = '✓ klo <b>' + confirmed + '</b> · perillä ~<b>' + hhmm(arrMin) + '</b>';
+      confBar.innerHTML = (tooLate ? '⚠️' : '✓') + ' klo <b>' + confirmed + '</b> · perillä ~<b>' + hhmm(arrMin) + '</b>' +
+        (tooLate ? ' — et ehdi jatkoon' : '');
       var clrBtn2 = el('button', 'dp-clear-btn', 'nollaa');
       (function (dKey, fId) {
         clrBtn2.addEventListener('click', function () { clearDeparture(dKey, fId); });
@@ -735,8 +762,8 @@
         cls += ' dp-dep-chip--latest';
       }
 
-      /* Latest-feasible: wrap in a wrapper with caption */
-      if (dep.latestFeasible && !(confirmed && dep.time === confirmed)) {
+      /* Latest-feasible AND actually reachable: wrap with "Vika yhteys" caption */
+      if (dep.latestFeasible && dep.reachable && !dep.past && !(confirmed && dep.time === confirmed)) {
         var chip = el('span', cls, dep.time + ' ↑');
         chip.title = 'Viimeinen yhteys jolla ehdit perille';
 
@@ -765,6 +792,10 @@
         /* Normal chip */
         var chip = el('span', cls, dep.time);
         chip.title = '';
+        if (confirmed && dep.time === confirmed) {
+          chip.setAttribute('aria-label', 'Valittu vuoro: ' + dep.time +
+            (tooLate ? ' — liian myöhäinen, et ehdi jatkoyhteyteen' : ''));
+        }
 
         var isTappable = !dep.past && !(confirmed && dep.time !== confirmed);
         if (isTappable) {
@@ -792,6 +823,24 @@
     if (!confirmed) {
       var hint = el('div', 'dp-ferry-block__hint', 'Napauta vuoroa vahvistaaksesi: "otin tämän"');
       wrap.appendChild(hint);
+    }
+
+    /* Booking CTA — bookable ferries link straight to the operator's portal */
+    var fobjFull = T.ferries[s.ferryId];
+    if (fobjFull && fobjFull.bookingUrl && (s.booking === 'yes' || s.booking === 'recommended')) {
+      var ctaWrap = el('div', 'dp-book-cta');
+      var bA = el('a', 'dp-book-btn',
+        '🎫 Varaa paikka' + (fobjFull.bookingProvider ? ' · ' + fobjFull.bookingProvider : '') + ' →');
+      bA.href = fobjFull.bookingUrl;
+      bA.target = '_blank';
+      bA.rel = 'noopener';
+      ctaWrap.appendChild(bA);
+      var dObj = isoToDate(dateKey);
+      var cap = (s.booking === 'yes' ? 'Varaus pakollinen. ' : 'Varaus suositeltu. ') +
+        'Valitse portaalissa reitti ' + displayName(s.from) + ' → ' + displayName(s.to) +
+        ' ja päivä ' + WEEKDAYS_FI[dObj.getDay()] + ' ' + fmtDateFi(dObj) + '.';
+      ctaWrap.appendChild(el('div', 'dp-book-cap', cap));
+      wrap.appendChild(ctaWrap);
     }
 
     return wrap;
@@ -861,7 +910,11 @@
     document.querySelectorAll('.view').forEach(function (v) { v.classList.remove('view--active'); });
     var v = document.getElementById('view-' + name);
     if (v) v.classList.add('view--active');
-    tabs.forEach(function (t) { t.classList.toggle('tab--active', t.getAttribute('data-view') === name); });
+    tabs.forEach(function (t) {
+      var active = t.getAttribute('data-view') === name;
+      t.classList.toggle('tab--active', active);
+      t.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
 
     /* Attach scroll listener for this view */
     ScrollStore.attach(name);
@@ -1176,12 +1229,15 @@
 
       (f.schedules || []).forEach(function (s) {
         var dir = el('div', 'ferry-dir');
-        dir.appendChild(el('h4', '', s.direction + ' <span class="days">· ' + (s.days || '') + (s.season ? ' · ' + s.season : '') + '</span>'));
-        var grid = el('div', 'time-grid');
         var runs = scheduleRuns(s, refDate);
+        var offMark = runs ? '' : ' <span class="days">· ei valittuna päivänä</span>';
+        dir.appendChild(el('h4', '', s.direction + ' <span class="days">· ' + (s.days || '') + (s.season ? ' · ' + s.season : '') + '</span>' + offMark));
+        var grid = el('div', 'time-grid');
         (s.times || []).forEach(function (t) {
           var cls = 'time-chip';
-          if (runs && isToday) {
+          if (!runs) {
+            cls += ' time-chip--off';
+          } else if (isToday) {
             if (minutesOf(t) < nowMin) cls += ' time-chip--past';
             else if (nextInfo && t === nextInfo.time && s.direction === nextInfo.dir) cls += ' time-chip--next';
           }
@@ -1347,8 +1403,9 @@
   function renderWeather(data, ts) {
     var wrap = $('#weatherList');
     wrap.innerHTML = '';
-    var tripStart = T.meta && T.meta.tripStart ? T.meta.tripStart : null;
-    var tripEnd = T.meta && T.meta.tripEnd ? T.meta.tripEnd : null;
+    var hasSel = !!(SELECTED && !autoDefault);
+    var tripStart = hasSel && T.meta && T.meta.tripStart ? T.meta.tripStart : null;
+    var tripEnd = hasSel && T.meta && T.meta.tripEnd ? T.meta.tripEnd : null;
     data.forEach(function (item) {
       var sum = item.sum;
       var card = el('div', 'wx-card');
@@ -1491,6 +1548,9 @@
     setFerryFilterToDate(opt.d1key);
     buildFerries();
 
+    // Refresh Info lodging cards so the Booking.com date-prefilled links match the chosen days
+    buildInfo();
+
     // Mark selected option card (only for an explicit user choice, not a soft auto-default)
     document.querySelectorAll('.opt-card').forEach(function (c) { c.classList.remove('opt-card--selected'); });
     document.querySelectorAll('.opt-choose').forEach(function (btn) {
@@ -1527,10 +1587,17 @@
 
     // INACTIVE — Skiftet does not run on the Brändö day
     if (opt.status === 'noFerry') {
-      var brWd = WEEKDAYS_FI_LONG[dateFromKey(opt.brandoKey).getDay()].toLowerCase();
+      var brDate = dateFromKey(opt.brandoKey);
+      var brWd = WEEKDAYS_FI_LONG[brDate.getDay()].toLowerCase();
+      var brDateStr = brDate.getDate() + '.' + (brDate.getMonth() + 1) + '.';
       var nc = el('div', 'opt-card opt-card--inactive');
-      nc.innerHTML = '<div class="opt-card__head">' + headHtml + '</div>' +
-        '<div class="opt-inactive-reason">⚓ Houtskärin reitin yhteysalus ei liikennöi ' + brWd + 'na (Brändö-päivä) — Brändö–Houtskär-yhteyttä ei tähän suuntaan ole.</div>';
+      nc.innerHTML = '<div class="opt-card__head">' + headHtml +
+          '<span class="opt-unavail-badge">Ei mahdollinen</span></div>' +
+        '<div class="opt-inactive-reason">' +
+          '<b>Houtskärin reitti</b> (Brändö–Houtskär) liikennöi vain ke, to, pe ja su, ' +
+          'mutta Brändö-päivä osuisi ' + brWd + 'lle ' + brDateStr +
+          '<div class="opt-inactive-hint">→ Valitse vaihtoehto, jonka Brändö-päivä on ke, to, pe tai su.</div>' +
+        '</div>';
       var link = el('a', 'opt-sched-link', 'Houtskärin reitin aikataulu →');
       link.href = 'javascript:void(0)';
       link.addEventListener('click', function (e) { e.preventDefault(); openFerrySchedule('skiftet', opt.brandoKey); });
@@ -1813,9 +1880,27 @@
       var card = el('div', 'lodging-card');
       var maps = (ac.lat != null) ? ('https://www.google.com/maps?q=' + ac.lat + ',' + ac.lon)
         : ('https://www.google.com/maps/search/' + encodeURIComponent(ac.name + ' ' + (ac.address || '')));
+      // Booking.com date-prefilled link (dates from the selected option's day plan, if any)
+      var bookHtml = '';
+      if (ac.bookingUrl) {
+        var ci = '', co = '';
+        var dp = T.dayPlan || [];
+        if (dp.length === 2 && dp[0].date && dp[1].date) {
+          if (ac.night === 1) { ci = dp[0].date; co = dp[1].date; }
+          else {
+            ci = dp[1].date;
+            var cod = isoToDate(dp[1].date); cod.setDate(cod.getDate() + 1);
+            co = cod.getFullYear() + '-' + pad(cod.getMonth() + 1) + '-' + pad(cod.getDate());
+          }
+        }
+        var u = ac.bookingUrl + (ci && co ? ('?checkin=' + ci + '&checkout=' + co + '&group_adults=2&no_rooms=1') : '');
+        bookHtml = '<a href="' + u + '" target="_blank" rel="noopener">🛏 Varaa Booking.comista' +
+          (ci && co ? ' (' + fmtDateFi(isoToDate(ci)) + '–' + fmtDateFi(isoToDate(co)) + ')' : '') + ' ›</a> · ';
+      }
       card.innerHTML =
         '<h3><span class="night">Yö ' + ac.night + '</span> ' + ac.name + '</h3>' +
         '<p>' + (ac.address || '') + (ac.note ? '<br>' + ac.note : '') + '</p>' +
+        bookHtml +
         (ac.link ? '<a href="' + ac.link + '" target="_blank" rel="noopener">Verkkosivu ›</a> · ' : '') +
         '<a href="' + maps + '" target="_blank" rel="noopener">Karttaan ›</a>';
       lod.appendChild(card);
