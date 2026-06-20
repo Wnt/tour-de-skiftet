@@ -193,7 +193,8 @@
             from: leg.from,
             to: leg.to,
             km: leg.km || 0,
-            departMin: null,   // filled by forward pass below
+            note: leg.note || '',
+            departMin: null,
             arriveMin: null
           });
 
@@ -220,7 +221,7 @@
             });
           }
 
-          // De-dup and sort
+          /* De-dup and sort */
           var seen = {};
           allTimes = allTimes.filter(function (t) {
             if (seen[t]) return false;
@@ -234,13 +235,14 @@
             vessel: vessel,
             from: leg.from,
             to: leg.to,
+            note: leg.note || '',
             booking: booking,
             crossingMin: crossMin,
             onDemand: onDemand,
             departures: allTimes.map(function (t) {
               return { time: t, min: minutesOf(t), past: false, latestFeasible: false, reachable: false };
             }),
-            chosenTime: null       // filled from tripProgress + forward pass
+            chosenTime: null
           });
         }
       });
@@ -283,17 +285,59 @@
       }
     }
 
-    /* Forward pass: assign departure/arrival minutes. */
+    /* Find the index of the first ferry step in the steps array */
+    function firstFerryIndex(steps) {
+      for (var i = 0; i < steps.length; i++) {
+        if (steps[i].type === 'ferry') return i;
+      }
+      return -1;
+    }
+
+    /* Sum bike ride+break minutes for steps[0..beforeIdx-1] */
+    function precedingBikeMinutes(steps, beforeIdx) {
+      var total = 0;
+      for (var i = 0; i < beforeIdx; i++) {
+        if (steps[i].type === 'bike') {
+          total += rideMin(steps[i].km);
+          if (steps[i].km >= 40) total += 15;
+        }
+      }
+      return total;
+    }
+
+    /* Forward pass: assign departure/arrival minutes.
+       First ferry gets all departures reachable=true.
+       If it has a confirmed time, back-schedule morningStart
+       so the preceding bike legs deliver the rider by that departure. */
     function forwardPass(steps, dateKey) {
       var prog = loadProgress();
       var dayProg = prog[dateKey] || {};
-      var currentMin = 9 * 60; // 09:00
 
       var nowMin = (function () {
         var n = new Date();
         return n.getHours() * 60 + n.getMinutes();
       })();
       var isToday = (isoToDate(dateKey).toDateString() === new Date().toDateString());
+
+      var firstFerryIdx = firstFerryIndex(steps);
+
+      /* Determine morningStart.
+         Default: 09:00 (540 min).
+         If the first ferry has a confirmed departure, back-schedule. */
+      var morningStart = 9 * 60;
+      if (firstFerryIdx >= 0) {
+        var firstFerry = steps[firstFerryIdx];
+        if (!firstFerry.onDemand && firstFerry.departures.length) {
+          var confirmed1 = dayProg[firstFerry.ferryId] || null;
+          if (confirmed1) {
+            var confMin1 = minutesOf(confirmed1);
+            var bikeBeforeFirst = precedingBikeMinutes(steps, firstFerryIdx);
+            morningStart = confMin1 - bikeBeforeFirst;
+          }
+        }
+      }
+
+      var currentMin = morningStart;
 
       for (var i = 0; i < steps.length; i++) {
         var s = steps[i];
@@ -305,18 +349,26 @@
           if (s.km >= 40) currentMin += 15;
 
         } else if (s.type === 'ferry') {
-          // Mark past departures (today only)
+          /* Mark past departures (today only) */
           if (isToday) {
             for (var j = 0; j < s.departures.length; j++) {
               if (s.departures[j].min < nowMin) s.departures[j].past = true;
             }
           }
-          // Mark reachable: a departure is reachable if its time >= currentMin
-          for (var k = 0; k < s.departures.length; k++) {
-            s.departures[k].reachable = (s.departures[k].min >= currentMin);
+
+          /* First ferry: all departures reachable */
+          var isFirstFerry = (i === firstFerryIdx);
+          if (isFirstFerry) {
+            for (var k = 0; k < s.departures.length; k++) {
+              s.departures[k].reachable = true;
+            }
+          } else {
+            for (var k = 0; k < s.departures.length; k++) {
+              s.departures[k].reachable = (s.departures[k].min >= currentMin);
+            }
           }
 
-          // Determine chosen time
+          /* Determine chosen time */
           var confirmed = dayProg[s.ferryId] || null;
           if (confirmed) {
             s.chosenTime = confirmed;
@@ -324,14 +376,14 @@
             currentMin = confMin + s.crossingMin;
           } else {
             s.chosenTime = null;
-            // For scheduling downstream: pick earliest reachable
+            /* For scheduling downstream: pick earliest reachable */
             var picked = null;
             for (var k = 0; k < s.departures.length; k++) {
               if (s.departures[k].reachable) { picked = s.departures[k]; break; }
             }
             if (!picked && s.departures.length) picked = s.departures[s.departures.length - 1];
             if (picked) currentMin = picked.min + s.crossingMin;
-            else currentMin += s.crossingMin; // on-demand fallback
+            else currentMin += s.crossingMin;
           }
         }
       }
@@ -379,6 +431,7 @@
   function renderDayPlan() {
     if (SELECTED) {
       (T.dayPlan || []).forEach(function (dayObj) {
+        /* Reset all computed state */
         (dayObj.steps || []).forEach(function (s) {
           if (s.type === 'ferry') {
             s.departures.forEach(function (d) { d.reachable = false; d.past = false; });
@@ -388,6 +441,7 @@
             s.arriveMin = null;
           }
         });
+
         var prog = loadProgress();
         var dayProg = prog[dayObj.date] || {};
         var nowMin = (function () {
@@ -395,9 +449,41 @@
           return n.getHours() * 60 + n.getMinutes();
         })();
         var isToday = (isoToDate(dayObj.date).toDateString() === new Date().toDateString());
-        var currentMin = 9 * 60;
+        var steps = dayObj.steps || [];
 
-        (dayObj.steps || []).forEach(function (s) {
+        /* Find first ferry index for this day */
+        var firstFerryIdx = -1;
+        for (var fi = 0; fi < steps.length; fi++) {
+          if (steps[fi].type === 'ferry') { firstFerryIdx = fi; break; }
+        }
+
+        /* Sum preceding bike minutes before a given index */
+        function sumBikeBefore(idx) {
+          var total = 0;
+          for (var bi = 0; bi < idx; bi++) {
+            if (steps[bi].type === 'bike') {
+              total += rideMin(steps[bi].km);
+              if (steps[bi].km >= 40) total += 15;
+            }
+          }
+          return total;
+        }
+
+        /* Determine morningStart — back-schedule from first ferry if confirmed */
+        var morningStart = 9 * 60;
+        if (firstFerryIdx >= 0) {
+          var ff = steps[firstFerryIdx];
+          if (!ff.onDemand && ff.departures.length) {
+            var confirmed1 = dayProg[ff.ferryId] || null;
+            if (confirmed1) {
+              morningStart = minutesOf(confirmed1) - sumBikeBefore(firstFerryIdx);
+            }
+          }
+        }
+
+        var currentMin = morningStart;
+
+        steps.forEach(function (s, idx) {
           if (s.type === 'bike') {
             s.departMin = currentMin;
             s.arriveMin = currentMin + rideMin(s.km);
@@ -407,7 +493,12 @@
             if (isToday) {
               s.departures.forEach(function (d) { if (d.min < nowMin) d.past = true; });
             }
-            s.departures.forEach(function (d) { d.reachable = (d.min >= currentMin); });
+            /* First ferry: all reachable */
+            if (idx === firstFerryIdx) {
+              s.departures.forEach(function (d) { d.reachable = true; });
+            } else {
+              s.departures.forEach(function (d) { d.reachable = (d.min >= currentMin); });
+            }
             var confirmed = dayProg[s.ferryId] || null;
             if (confirmed) {
               s.chosenTime = confirmed;
@@ -454,17 +545,63 @@
       var prog = loadProgress();
       var dayProg = prog[dayObj.date] || {};
 
-      (dayObj.steps || []).forEach(function (s) {
+      /* Pre-locate the index of the next ferry for each step (for too-late check) */
+      var steps = dayObj.steps || [];
+      function nextFerryAfter(idx) {
+        for (var ni = idx + 1; ni < steps.length; ni++) {
+          if (steps[ni].type === 'ferry') return steps[ni];
+        }
+        return null;
+      }
+
+      steps.forEach(function (s, idx) {
         if (s.type === 'bike') {
           var tLabel = s.departMin != null ? hhmm(s.departMin) : '—';
-          var text = '🚲 ' + displayName(s.from) + ' → ' + displayName(s.to) +
-            ' · ' + fmtKm(s.km) + ' km · ~' + fmtDur(rideMin(s.km));
+
+          /* Note appended after distance */
+          var distText = fmtKm(s.km) + ' km · ~' + fmtDur(rideMin(s.km));
+          if (s.note) distText += ' · ' + s.note;
+          var routeText = '🚲 ' + displayName(s.from) + ' → ' + displayName(s.to) + ' · ' + distText;
+
+          /* Google Maps directions link */
+          var fromP = place(s.from);
+          var toP = place(s.to);
+          var mapsHtml = '';
+          if (hasCoord(fromP) && hasCoord(toP)) {
+            var mapsUrl = 'https://www.google.com/maps/dir/?api=1' +
+              '&origin=' + fromP.lat + ',' + fromP.lon +
+              '&destination=' + toP.lat + ',' + toP.lon +
+              '&travelmode=bicycling';
+            mapsHtml = '<a class="day-card__gmaps-link" href="' + mapsUrl +
+              '" target="_blank" rel="noopener">🧭 Reittiohjeet →</a>';
+          }
+
           var row = el('div', 'day-card__row');
-          row.innerHTML = '<span class="t">' + tLabel + '</span><span>' + text + '</span>';
+          row.innerHTML =
+            '<span class="t">' + tLabel + '</span>' +
+            '<span class="day-card__bike-cell">' + routeText + mapsHtml + '</span>';
           body.appendChild(row);
 
         } else if (s.type === 'ferry') {
-          body.appendChild(renderFerryStep(s, dayObj.date, dayProg));
+          /* Too-late check — compute against next ferry's departures */
+          var nextFerry = nextFerryAfter(idx);
+          var tooLate = false;
+          if (s.chosenTime && nextFerry && nextFerry.departures.length) {
+            var bikeMinBetween = 0;
+            for (var bi = idx + 1; bi < steps.length; bi++) {
+              if (steps[bi] === nextFerry) break;
+              if (steps[bi].type === 'bike') {
+                bikeMinBetween += rideMin(steps[bi].km);
+                if (steps[bi].km >= 40) bikeMinBetween += 15;
+              }
+            }
+            var arrivalAfterChosen = minutesOf(s.chosenTime) + s.crossingMin;
+            var earliestNextDep = arrivalAfterChosen + bikeMinBetween;
+            var lastNextDep = nextFerry.departures[nextFerry.departures.length - 1].min;
+            if (earliestNextDep > lastNextDep) tooLate = true;
+          }
+
+          body.appendChild(renderFerryStep(s, dayObj.date, dayProg, tooLate));
         }
       });
 
@@ -477,13 +614,17 @@
       card.appendChild(body);
       dp.appendChild(card);
     });
+
+    /* After route re-renders, restore saved scroll position */
+    ScrollStore.restore('route');
   }
 
   /* ---------- renderFerryStep: render one ferry step block ---------- */
-  function renderFerryStep(s, dateKey, dayProg) {
+  function renderFerryStep(s, dateKey, dayProg, tooLate) {
     var confirmed = dayProg[s.ferryId] || null;
 
-    var wrap = el('div', 'dp-ferry-block');
+    var blockCls = 'dp-ferry-block' + (tooLate ? ' dp-ferry-block--toolate' : '');
+    var wrap = el('div', blockCls);
 
     /* Header row: icon + route + booking badge + Aikataulu link */
     var bookBadge = '';
@@ -508,16 +649,25 @@
     wrap.appendChild(head);
 
     /* Crossing duration sub-line */
-    var sub = el('div', 'dp-ferry-block__sub',
-      '~' + s.crossingMin + ' min ylitys');
+    var sub = el('div', 'dp-ferry-block__sub', '~' + s.crossingMin + ' min ylitys');
     wrap.appendChild(sub);
+
+    /* Ferry note sub-line */
+    if (s.note) {
+      wrap.appendChild(el('div', 'dp-ferry-block__sub', s.note));
+    }
+
+    /* Too-late warning banner */
+    if (tooLate) {
+      var warnText = '⚠️ Tällä vuorolla et ehdi seuraavaan lauttaan. Valitse aikaisempi vuoro.';
+      wrap.appendChild(el('div', 'dp-ferry-block__toolate', warnText));
+    }
 
     /* On-demand ferry */
     if (s.onDemand) {
       wrap.appendChild(el('div', 'dp-ferry-block__ondemand',
         '⏱ Kulkee tarvittaessa — ei kiinteää aikataulua'));
       if (confirmed) {
-        /* Confirmed on-demand */
         var confRow = el('div', 'dp-ferry-block__confirmed');
         confRow.innerHTML = '✓ klo <b>' + confirmed + '</b>';
         var clrBtn = el('button', 'dp-clear-btn', 'nollaa');
@@ -566,9 +716,10 @@
     var grid = el('div', 'dp-dep-grid');
 
     s.departures.forEach(function (dep) {
+      /* Determine chip class */
       var cls = 'dp-dep-chip';
       if (confirmed && dep.time === confirmed) {
-        cls += ' dp-dep-chip--chosen';
+        cls += tooLate ? ' dp-dep-chip--chosen-toolate' : ' dp-dep-chip--chosen';
       } else if (dep.past) {
         cls += ' dp-dep-chip--past';
       } else if (!dep.reachable) {
@@ -577,30 +728,55 @@
         cls += ' dp-dep-chip--latest';
       }
 
-      var chip = el('span', cls, dep.time);
-      chip.title = dep.latestFeasible ? 'Viimeinen suositeltava lähtö' : '';
+      /* Latest-feasible: wrap in a wrapper with caption */
+      if (dep.latestFeasible && !(confirmed && dep.time === confirmed)) {
+        var chip = el('span', cls, dep.time + ' ↑');
+        chip.title = 'Viimeinen yhteys jolla ehdit perille';
 
-      /* Only tappable if not past and not already confirmed to a different time */
-      var isTappable = !dep.past && !(confirmed && dep.time !== confirmed);
-      if (isTappable) {
-        chip.setAttribute('role', 'button');
-        chip.setAttribute('tabindex', '0');
-        (function (dKey, fId, time) {
-          function doConfirm() {
-            if (confirmed === time) {
-              clearDeparture(dKey, fId);
-            } else {
-              chooseDeparture(dKey, fId, time);
+        var isTappable = !dep.past && !(confirmed && dep.time !== confirmed);
+        if (isTappable) {
+          chip.setAttribute('role', 'button');
+          chip.setAttribute('tabindex', '0');
+          (function (dKey, fId, time) {
+            function doConfirm() {
+              if (confirmed === time) { clearDeparture(dKey, fId); }
+              else { chooseDeparture(dKey, fId, time); }
             }
-          }
-          chip.addEventListener('click', doConfirm);
-          chip.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); doConfirm(); }
-          });
-        }(dateKey, s.ferryId, dep.time));
-      }
+            chip.addEventListener('click', doConfirm);
+            chip.addEventListener('keydown', function (e) {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); doConfirm(); }
+            });
+          }(dateKey, s.ferryId, dep.time));
+        }
 
-      grid.appendChild(chip);
+        var chipWrap = el('span', 'dp-dep-chip-wrap');
+        chipWrap.appendChild(chip);
+        chipWrap.appendChild(el('span', 'dp-dep-chip-wrap__caption', 'Vika yhteys'));
+        grid.appendChild(chipWrap);
+
+      } else {
+        /* Normal chip */
+        var chip = el('span', cls, dep.time);
+        chip.title = '';
+
+        var isTappable = !dep.past && !(confirmed && dep.time !== confirmed);
+        if (isTappable) {
+          chip.setAttribute('role', 'button');
+          chip.setAttribute('tabindex', '0');
+          (function (dKey, fId, time) {
+            function doConfirm() {
+              if (confirmed === time) { clearDeparture(dKey, fId); }
+              else { chooseDeparture(dKey, fId, time); }
+            }
+            chip.addEventListener('click', doConfirm);
+            chip.addEventListener('keydown', function (e) {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); doConfirm(); }
+            });
+          }(dateKey, s.ferryId, dep.time));
+        }
+
+        grid.appendChild(chip);
+      }
     });
 
     wrap.appendChild(grid);
@@ -618,23 +794,102 @@
   var SELECTED = null;
   var autoDefault = false; // true when SELECTED is a non-persisted weather auto-default
 
+  /* ---------- ScrollStore: persist scroll position per view ---------- */
+  var ScrollStore = (function () {
+    var PREFIX = 'skiftet_scroll_';
+    var timers = {};
+    function key(name) { return PREFIX + name; }
+    function _scrollTop(name) {
+      var sp = document.querySelector('#view-' + name + ' .scroll-pad');
+      return sp ? sp.scrollTop : 0;
+    }
+    function save(name, top) {
+      try { sessionStorage.setItem(key(name), String(top == null ? _scrollTop(name) : top)); } catch (e) {}
+    }
+    function get(name) {
+      try { var v = sessionStorage.getItem(key(name)); return v !== null ? +v : null; } catch (e) { return null; }
+    }
+    function clear(name) {
+      try { sessionStorage.removeItem(key(name)); } catch (e) {}
+    }
+    function attach(name) {
+      var sp = document.querySelector('#view-' + name + ' .scroll-pad');
+      if (!sp || sp._scrollStoreAttached) return;
+      sp._scrollStoreAttached = true;
+      sp.addEventListener('scroll', function () {
+        if (timers[name]) clearTimeout(timers[name]);
+        timers[name] = setTimeout(function () { save(name); }, 150);
+      });
+    }
+    function restore(name) {
+      var v = get(name);
+      var sp = document.querySelector('#view-' + name + ' .scroll-pad');
+      if (!sp) return false;
+      if (v !== null) {
+        sp.scrollTop = v;
+        return true;
+      }
+      return false;
+    }
+    return { save: save, get: get, clear: clear, attach: attach, restore: restore };
+  }());
+
+  /* ---------- HashRouter: valid view names and hash <-> showView bridge ---------- */
+  var VALID_VIEWS = ['map', 'route', 'ferries', 'weather', 'options', 'info'];
+  var _programmaticHash = false; // set when we change the hash ourselves, to ignore the resulting hashchange
+
+  function viewFromHash() {
+    var h = (location.hash || '').replace('#', '');
+    return (VALID_VIEWS.indexOf(h) >= 0) ? h : null;
+  }
+
   /* ---------- Tab navigation ---------- */
   var mapInited = false;
   var tabs = document.querySelectorAll('.tab');
+
   function showView(name) {
+    var newHash = '#' + name;
+    if (location.hash !== newHash) { _programmaticHash = true; location.hash = newHash; }
+
     document.querySelectorAll('.view').forEach(function (v) { v.classList.remove('view--active'); });
     var v = document.getElementById('view-' + name);
     if (v) v.classList.add('view--active');
     tabs.forEach(function (t) { t.classList.toggle('tab--active', t.getAttribute('data-view') === name); });
+
+    /* Attach scroll listener for this view */
+    ScrollStore.attach(name);
+
     if (name === 'map') {
       if (!mapInited) initMap();
       else if (window._map) setTimeout(function () { window._map.invalidateSize(); }, 60);
     }
-    if (name === 'weather') ensureWeather();
-    if (name === 'options') { ensureOptions(); setTimeout(scrollOptionsToTarget, 60); }
+    if (name === 'weather') {
+      ensureWeather();
+      ScrollStore.restore('weather');
+    }
+    if (name === 'options') {
+      ensureOptions();
+    }
+    if (name === 'route') {
+      ScrollStore.restore('route');
+    }
+    if (name === 'ferries') {
+      ScrollStore.restore('ferries');
+    }
+    if (name === 'info') {
+      ScrollStore.restore('info');
+    }
   }
+
   tabs.forEach(function (t) {
     t.addEventListener('click', function () { showView(t.getAttribute('data-view')); });
+  });
+
+  /* hashchange: back/forward browser navigation and external deep links */
+  window.addEventListener('hashchange', function () {
+    if (_programmaticHash) { _programmaticHash = false; return; }
+    var name = viewFromHash();
+    if (name) showView(name);
   });
 
   /* ---------- Net status ---------- */
@@ -798,32 +1053,9 @@
     chip(ferryCount, 'lauttaväliä');
     chip((T.dayPlan ? T.dayPlan.length : 3) + ' pv', 'kesto · 2 yötä');
 
-    var list = $('#legList');
-    list.innerHTML = '';
-    legs.forEach(function (l) {
-      var a = place(l.from), b = place(l.to);
-      var ferry = l.mode === 'ferry';
-      var row = el('div', 'leg ' + (ferry ? 'leg--ferry' : 'leg--bike'));
-      var icon = ferry ? '⛴️' : '🚲';
-      var tag = ferry && l.ferry ? '<span class="leg__tag">aikataulu ›</span>' : '';
-      var sub = '';
-      if (ferry) {
-        var fobj = (T.ferries || {})[l.ferry];
-        if (fobj && fobj.crossingMin) sub = '<small>⛴ ~' + fobj.crossingMin + ' min</small>';
-      } else if (l.km != null) {
-        sub = '<small>~' + fmtDur(rideMin(l.km)) + '</small>';
-      }
-      row.innerHTML =
-        '<div class="leg__icon">' + icon + '</div>' +
-        '<div class="leg__main"><div class="leg__route">' + a.name + ' → ' + b.name + tag + '</div>' +
-        '<div class="leg__meta">' + (l.island || (ferry ? 'Lauttaväli' : '')) + (l.note ? ' · ' + l.note : '') + '</div></div>' +
-        '<div class="leg__dist">' + (l.km != null ? l.km + ' km' : '—') + sub + '</div>';
-      if (ferry && l.ferry) {
-        row.style.cursor = 'pointer';
-        row.addEventListener('click', function () { showView('ferries'); setTimeout(function () { scrollToFerry(l.ferry); }, 80); });
-      }
-      list.appendChild(row);
-    });
+    /* When the user picks a new option, discard any stale saved route scroll
+       so the route view starts at the top for the new plan. */
+    ScrollStore.clear('route');
 
     renderDayPlan();
   }
@@ -1146,6 +1378,8 @@
       $('#weatherUpdated').textContent = 'Päivitetty ' + pad(dt.getHours()) + ':' + pad(dt.getMinutes()) +
         ' · Ilmatieteen laitos' + (navigator.onLine ? '' : ' · offline (tallennettu ennuste)');
     }
+    /* After weather re-renders, restore saved scroll position */
+    ScrollStore.restore('weather');
   }
 
   /* Re-render weather from cache with current trip highlight (called by applyOption) */
@@ -1365,14 +1599,26 @@
       $('#optionsUpdated').textContent = 'Päivitetty ' + pad(dt.getHours()) + ':' + pad(dt.getMinutes()) +
         ' · Ilmatieteen laitos' + (navigator.onLine ? '' : ' · offline');
     }
-    setTimeout(scrollOptionsToTarget, 0);
+    setTimeout(function () {
+      scrollOptionsToTarget();
+      /* Attach scroll listener now that the options DOM exists */
+      ScrollStore.attach('options');
+    }, 0);
   }
 
   // Default: scroll so today's day-group is at the top; if the user has explicitly
   // selected a (possibly earlier) day, scroll to that instead.
+  // If sessionStorage has a saved scroll for 'options', honour it instead (refresh case).
   function scrollOptionsToTarget() {
     var sp = document.querySelector('#view-options .scroll-pad');
     if (!sp) return;
+    /* If a saved scroll position exists, restore it and stop */
+    var saved = ScrollStore.get('options');
+    if (saved !== null) {
+      sp.scrollTop = saved;
+      return;
+    }
+    /* No saved position: scroll to today's or selected group */
     var key = (SELECTED && !autoDefault && SELECTED.d1key) ? SELECTED.d1key : todayKeyLocal();
     var grp = sp.querySelector('.opt-daygroup[data-daykey="' + key + '"]');
     if (!grp) grp = sp.querySelector('.opt-daygroup'); // fallback: first group
@@ -1598,20 +1844,30 @@
   buildFerries();
   buildInfo();
 
-  // Try to restore persisted selection (noNav=true: stay on options view)
+  // Try to restore persisted selection (noNav=true: stay on initial hash view)
   (function () {
     var stored = null;
     try { stored = JSON.parse(localStorage.getItem(SEL_KEY) || 'null'); } catch (e) {}
     if (stored && stored.direction && stored.d1key && stored.d2key) {
-      // Build a minimal opt object with just the keys (no wx data needed for applyOption meta steps)
       applyOption({ direction: stored.direction, d1key: stored.d1key, d2key: stored.d2key }, true);
     }
   })();
 
-  // Default view is options; initialize it now.
-  if (document.getElementById('view-options').classList.contains('view--active')) {
-    ensureOptions();
-  }
+  // Determine initial view from URL hash (deep-link) or default to 'options'
+  (function () {
+    var initView = viewFromHash() || 'options';
+
+    /* Attach scroll listeners for all views eagerly */
+    VALID_VIEWS.forEach(function (name) { ScrollStore.attach(name); });
+
+    /* Show the initial view (showView manages _inHashNav internally) */
+    showView(initView);
+
+    /* For other views: restore their saved scroll positions now. */
+    if (initView !== 'options') {
+      ScrollStore.restore(initView);
+    }
+  })();
 
   /* ---------- Add to Home Screen (A2HS) toast ---------- */
   (function () {

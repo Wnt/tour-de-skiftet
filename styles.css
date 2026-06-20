@@ -221,8 +221,10 @@ h1, h2, h3, p { margin: 0; }
 .pin--lodging { background: var(--bike); width:30px; height:30px;}
 .pin--side { background: #868e96; width:22px; height:22px;}
 .dist-label {
+  display: inline-block;
   background: rgba(255,255,255,.92); border:1px solid var(--line); border-radius:8px;
   padding:1px 6px; font-size:.72rem; font-weight:700; white-space:nowrap; box-shadow: var(--shadow);
+  transform: translate(-50%, -50%);
 }
 .dist-label--bike { color: var(--bike); }
 .dist-label--ferry { color: var(--ferry); }
@@ -717,3 +719,93 @@ h1, h2, h3, p { margin: 0; }
   border: 1px solid var(--line); border-radius: 999px; background: #fff;
 }
 .opt-sched-link:active { opacity: .7; }
+
+/* ===== REITTI REDESIGN: bike step note sub-line ===== */
+.day-card__row-note {
+  display: block;
+  font-size: .72rem;
+  color: var(--muted);
+  font-style: italic;
+  margin-top: 1px;
+  padding-left: 54px;
+}
+
+/* ===== REITTI REDESIGN: Google Maps directions link ===== */
+.day-card__gmaps-link {
+  display: inline-block;
+  margin-top: 3px;
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--ferry);
+  text-decoration: none;
+  padding: 2px 8px;
+  border: 1px solid #cfe3f7;
+  border-radius: 999px;
+  background: #f0f8ff;
+  white-space: nowrap;
+}
+.day-card__gmaps-link:active { opacity: .7; }
+
+/* Wrapper to hold both the row text and the maps link below it */
+.day-card__bike-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ===== REITTI REDESIGN: too-late warning banner on ferry block ===== */
+.dp-ferry-block__toolate {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #fff0f0;
+  border-bottom: 1.5px solid #ff8787;
+  font-size: .82rem;
+  font-weight: 700;
+  color: #c92a2a;
+  line-height: 1.4;
+}
+.dp-ferry-block--toolate {
+  border-color: #ff6b6b;
+}
+.dp-ferry-block--toolate .dp-ferry-block__head {
+  background: #fff5f5;
+  border-bottom-color: #ffa8a8;
+}
+
+/* Chosen chip in too-late state overrides green with red */
+.dp-dep-chip--chosen-toolate {
+  background: #c92a2a;
+  border-color: #a61e1e;
+  color: #fff;
+  font-weight: 800;
+  cursor: default;
+}
+.dp-dep-chip--chosen-toolate::before {
+  content: '\26A0 ';
+}
+
+/* ===== REITTI REDESIGN: "Vika yhteys" chip restyle ===== */
+.dp-dep-chip--latest {
+  border-color: var(--teal);
+  background: #f0fbfc;
+  color: var(--teal-dark);
+  font-weight: 700;
+  box-shadow: none;
+}
+
+/* Wrapper that holds the chip + caption below it */
+.dp-dep-chip-wrap {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.dp-dep-chip-wrap__caption {
+  font-size: .62rem;
+  color: var(--teal-dark);
+  font-weight: 700;
+  white-space: nowrap;
+  letter-spacing: -.1px;
+}
