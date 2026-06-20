@@ -4,7 +4,7 @@
    - Map tiles (OpenStreetMap): cache-first, stored as viewed -> available offline afterwards (capped).
    - Weather API (Open-Meteo): network-first, falls back to last cached response. */
 
-const VERSION = 'skiftet-v12';
+const VERSION = 'skiftet-v13';
 const SHELL_CACHE = `${VERSION}-shell`;
 const TILE_CACHE = `${VERSION}-tiles`;
 const API_CACHE = `${VERSION}-api`;
@@ -28,7 +28,9 @@ const SHELL_ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(SHELL_CACHE)
-      .then((cache) => cache.addAll(SHELL_ASSETS))
+      // cache:'reload' bypasses the HTTP cache so a freshly-installed worker
+      // always precaches the just-deployed asset bytes, never stale ones.
+      .then((cache) => cache.addAll(SHELL_ASSETS.map((u) => new Request(u, { cache: 'reload' }))))
       .then(() => self.skipWaiting())
   );
 });

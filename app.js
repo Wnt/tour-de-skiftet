@@ -4,7 +4,7 @@
   var T = window.TRIP || {};
   var P = T.places || {};
 
-  /* ---------- Service worker ---------- */
+  /* ---------- Service worker (fast, reliable updates) ---------- */
   if ('serviceWorker' in navigator) {
     var hadController = !!navigator.serviceWorker.controller;
     var refreshing = false;
@@ -14,8 +14,18 @@
       window.location.reload();
     });
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('sw.js').then(function (reg) {
-        reg.update();
+      // updateViaCache:'none' makes the browser always re-fetch sw.js from the
+      // network when checking for a new version, bypassing the GitHub Pages HTTP
+      // cache (max-age=600) — so a new release is detected within seconds, not
+      // up to ~10 min later. We also re-check on focus and on a short interval,
+      // which covers an installed PWA that is reopened or left running.
+      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(function (reg) {
+        function checkUpdate() { if (reg.update) reg.update().catch(function () {}); }
+        checkUpdate();
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState === 'visible') checkUpdate();
+        });
+        setInterval(checkUpdate, 60 * 1000);
       }).catch(function (e) { console.warn('SW registration failed', e); });
     });
   }
