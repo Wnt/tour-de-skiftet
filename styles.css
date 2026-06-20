@@ -136,6 +136,8 @@ h1, h2, h3, p { margin: 0; }
 .day-card__overnight { margin-top:8px; font-size:.84rem; background:#fff9db; border:1px solid #ffec99; border-radius:10px; padding:8px 10px; display:flex; flex-direction:column; align-items:flex-start; gap:6px;}
 .day-card__book-link { display:inline-flex; align-items:center; min-height:34px; font-size:.78rem; font-weight:800; color:var(--ferry); text-decoration:none; padding:5px 11px; border:1px solid #ffd8a8; border-radius:999px; background:#fff; }
 .day-card__book-link:active { opacity:.7; }
+.day-card__overnight-note { font-size:.78rem; color:var(--muted); font-weight:400; line-height:1.4; }
+.day-card__overnight--end { background:#eef6f7; border-color:var(--line); font-weight:700; color:var(--teal-dark); }
 
 /* Callouts */
 .info-callout { background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 12px; padding: 12px 14px; font-size: .86rem; margin-bottom: 14px; }

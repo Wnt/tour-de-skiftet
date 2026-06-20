@@ -99,6 +99,68 @@
   /* ---------- Canonical legs (clockwise order from data.js) ---------- */
   var CANON_LEGS = (T.legs || []).map(function (l) { return Object.assign({}, l); });
 
+  /* Notes that depend on the ACTUAL travel direction (canonical data is CW).
+     Keyed "from>to" — applied after legs are built so both directions read true. */
+  var DIR_NOTES = {
+    'peterzens>heponiemi': 'Lauttarantaan',
+    'heponiemi>peterzens': 'Takaisin lähtöpisteeseen — matka päättyy',
+    'peterzens>kivimaa':   'Kohti Osnäsin lauttaa — retki alkaa',
+    'kivimaa>peterzens':   'Takaisin lähtöpisteeseen',
+    'nasby>roslax':        'Suora maantie Roslaxin lauttarantaan — ei kaapelilossia',
+    'roslax>nasby':        'Suora maantie Näsbyn kylään (Sybarit) — ei kaapelilossia',
+    'ava>osnas':           'Ådan — maksuton tähän suuntaan (varaus silti pakollinen)',
+    'osnas>ava':           'Ådan — maksullinen: pyörä 4,80 € (verkko) / 6 €. Varaus pakollinen.',
+    'roslax>torsholma':    'Houtskärin reitti ~2 h (m/s Rosala 2) — varaa edellisenä iltana klo 17 mennessä',
+    'torsholma>roslax':    'Houtskärin reitti ~2 h (m/s Rosala 2) — varaa jo ennen matkaa, edellisiltana klo 17 (su: la klo 14)'
+  };
+
+  /* Direction-aware lodging plan for a day. In CW you drive in on day 1 and the
+     2nd Kustavi night is after day 2. In CCW the binding Houtskär ferry is on day 1
+     and must be pre-booked, so you must overnight at Peterzens BEFORE departure;
+     day 2 then just returns to Kustavi and you drive home (no 2nd night). */
+  function lodgingFor(dir, dayNum) {
+    if (dir === 'cw') {
+      if (dayNum === 1) return {
+        preNight: null,
+        morningNote: 'Aja autolla Kustaviin (Peterzens), pura pyörät — retki alkaa täältä.',
+        overnight: { key: 'sybarit' },
+        endNote: null
+      };
+      return { preNight: null, morningNote: null, overnight: { key: 'peterzens' }, endNote: null };
+    }
+    // ccw
+    if (dayNum === 1) return {
+      preNight: { key: 'peterzens', note: 'Aja Kustaviin jo edellisenä iltana ja yövy täällä. Varaa Houtskärin reitin lautta (Torsholma→Roslax) klo 17 mennessä — su-lähtö viimeistään la klo 14. Aamulla ehdit ajoissa lautoille.' },
+      morningNote: 'Pura pyörät ja lähde aamulla Peterzensiltä kohti Osnäsin lauttaa.',
+      overnight: { key: 'sybarit' },
+      endNote: null
+    };
+    return { preNight: null, morningNote: null, overnight: null, endNote: 'Takaisin Kustaviin (Peterzens) — matka päättyy. Auto odottaa täällä; aja kotiin.' };
+  }
+
+  function accByKey(key) {
+    var sub = key === 'sybarit' ? 'sybarit' : 'peterzens';
+    return (T.accommodations || []).filter(function (a) { return (a.name || '').toLowerCase().indexOf(sub) >= 0; })[0];
+  }
+  function shiftKey(key, n) { var d = isoToDate(key); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+
+  /* Render a lodging box: "<prefix>: <name>" + optional note + date-prefilled Booking.com link */
+  function lodgingBox(prefix, accKey, ci, co, extraNote) {
+    var acc = accByKey(accKey);
+    var name = acc ? acc.name : accKey;
+    var box = el('div', 'day-card__overnight');
+    box.innerHTML = prefix + ': <b>' + name + '</b>';
+    if (extraNote) box.appendChild(el('div', 'day-card__overnight-note', extraNote));
+    if (acc && acc.bookingUrl && ci && co) {
+      var bUrl = acc.bookingUrl + '?checkin=' + ci + '&checkout=' + co + '&group_adults=2&no_rooms=1';
+      var bLink = el('a', 'day-card__book-link',
+        '🛏 Varaa Booking.comista (' + fmtDateFi(isoToDate(ci)) + '–' + fmtDateFi(isoToDate(co)) + ') →');
+      bLink.href = bUrl; bLink.target = '_blank'; bLink.rel = 'noopener';
+      box.appendChild(bLink);
+    }
+    return box;
+  }
+
   /* ---------- Generate legs for a given direction ---------- */
   function generateLegs(dir) {
     var legs;
@@ -126,6 +188,11 @@
       } else {
         leg.day = 2;
       }
+    });
+    // Direction-correct notes for legs whose meaning flips with travel direction
+    legs.forEach(function (leg) {
+      var k = leg.from + '>' + leg.to;
+      if (DIR_NOTES.hasOwnProperty(k)) leg.note = DIR_NOTES[k];
     });
     return legs;
   }
@@ -417,6 +484,7 @@
       computeLatestFeasible(steps);
       forwardPass(steps, dateKey);
 
+      var lodg = lodgingFor(dir, dayNum);
       return {
         day: dayNum,
         date: dateKey,
@@ -424,9 +492,10 @@
         dir: dir,
         bikeKm: bikeKm,
         bikeMin: bikeMin,
-        overnight: dayNum === 1
-          ? 'Restaurang Sybarit B&B (Houtskär) — yö 1'
-          : 'Peterzens Boathouse (Kustavi) — yö 2',
+        preNight: lodg.preNight,
+        morningNote: lodg.morningNote,
+        overnight: lodg.overnight,
+        endNote: lodg.endNote,
         steps: steps
       };
     }
@@ -545,6 +614,12 @@
 
       var body = el('div', 'day-card__body');
 
+      /* Pre-departure overnight (CCW: stay at Peterzens the evening before, book ferry) */
+      if (dayObj.preNight) {
+        body.appendChild(lodgingBox('🛏 Edellisiltana', dayObj.preNight.key,
+          shiftKey(dayObj.date, -1), dayObj.date, dayObj.preNight.note));
+      }
+
       /* Ride total chip */
       if (dayObj.bikeKm > 0) {
         body.appendChild(el('div', 'day-card__ride',
@@ -552,10 +627,10 @@
           ' pyöräaikaa (' + EBIKE_KMH + ' km/h)'));
       }
 
-      /* Drive note for day 1 */
-      if (dayObj.day === 1) {
+      /* Morning note (direction-aware) */
+      if (dayObj.morningNote) {
         body.appendChild(el('div', 'day-card__row',
-          '<span class="t">aamu</span><span>Aja autolla Kustaviin (Peterzens), pura pyörät.</span>'));
+          '<span class="t">aamu</span><span>' + dayObj.morningNote + '</span>'));
       }
 
       /* Render steps */
@@ -627,26 +702,22 @@
         }
       });
 
-      /* Overnight box (with a date-prefilled Booking.com link) */
+      /* Overnight box after this day (Sybarit after day 1; Peterzens after CW day 2) */
       if (dayObj.overnight) {
-        var ovBox = el('div', 'day-card__overnight');
-        ovBox.innerHTML = '🛏 Yöpyminen: <b>' + dayObj.overnight + '</b>';
-        var acc = (T.accommodations || []).filter(function (a) { return a.night === dayObj.day; })[0];
-        if (acc && acc.bookingUrl) {
-          var ci = dayObj.date, co;
-          if (dayObj.day === 1 && T.dayPlan[1] && T.dayPlan[1].date) {
-            co = T.dayPlan[1].date;
-          } else {
-            var cod = isoToDate(dayObj.date); cod.setDate(cod.getDate() + 1);
-            co = cod.getFullYear() + '-' + pad(cod.getMonth() + 1) + '-' + pad(cod.getDate());
-          }
-          var bUrl = acc.bookingUrl + '?checkin=' + ci + '&checkout=' + co + '&group_adults=2&no_rooms=1';
-          var bLink = el('a', 'day-card__book-link',
-            '🛏 Varaa Booking.comista (' + fmtDateFi(isoToDate(ci)) + '–' + fmtDateFi(isoToDate(co)) + ') →');
-          bLink.href = bUrl; bLink.target = '_blank'; bLink.rel = 'noopener';
-          ovBox.appendChild(bLink);
+        var ovKey = dayObj.overnight.key;
+        var ci, co;
+        if (ovKey === 'sybarit') {
+          ci = dayObj.date;
+          co = (T.dayPlan[1] && T.dayPlan[1].date) || shiftKey(dayObj.date, 1);
+        } else {
+          ci = dayObj.date; co = shiftKey(dayObj.date, 1); // Peterzens after CW day 2
         }
-        body.appendChild(ovBox);
+        body.appendChild(lodgingBox('🛏 Yöpyminen', ovKey, ci, co, null));
+      }
+
+      /* End-of-trip note (CCW day 2: return to Kustavi and drive home) */
+      if (dayObj.endNote) {
+        body.appendChild(el('div', 'day-card__overnight day-card__overnight--end', '🏁 ' + dayObj.endNote));
       }
 
       card.appendChild(body);
@@ -1886,29 +1957,33 @@
   function buildInfo() {
     var lod = $('#lodgingList');
     lod.innerHTML = '';
+    var dir = (SELECTED && SELECTED.direction) ? SELECTED.direction
+      : (T.meta && T.meta.direction === 'Vastapäivään' ? 'ccw' : 'cw');
+    var dp = T.dayPlan || [];
+    var d1 = (dp[0] && dp[0].date) || null, d2 = (dp[1] && dp[1].date) || null;
     (T.accommodations || []).forEach(function (ac) {
       var card = el('div', 'lodging-card');
       var maps = (ac.lat != null) ? ('https://www.google.com/maps?q=' + ac.lat + ',' + ac.lon)
         : ('https://www.google.com/maps/search/' + encodeURIComponent(ac.name + ' ' + (ac.address || '')));
-      // Booking.com date-prefilled link (dates from the selected option's day plan, if any)
+      // Direction-aware stay: Sybarit (Houtskär) is the night after day 1 in both
+      // directions; Peterzens (Kustavi) is after day 2 in CW, but the ARRIVAL EVE in CCW.
+      var isSyb = /sybarit/i.test(ac.name || '');
+      var ci = '', co = '', nightLabel;
+      if (isSyb) {
+        if (d1 && d2) { ci = d1; co = d2; }
+        nightLabel = 'Yö 1';
+      } else { // Peterzens
+        if (dir === 'cw') { if (d2) { ci = d2; co = shiftKey(d2, 1); } nightLabel = 'Yö 2'; }
+        else { if (d1) { ci = shiftKey(d1, -1); co = d1; } nightLabel = 'Saapumisilta'; }
+      }
       var bookHtml = '';
       if (ac.bookingUrl) {
-        var ci = '', co = '';
-        var dp = T.dayPlan || [];
-        if (dp.length === 2 && dp[0].date && dp[1].date) {
-          if (ac.night === 1) { ci = dp[0].date; co = dp[1].date; }
-          else {
-            ci = dp[1].date;
-            var cod = isoToDate(dp[1].date); cod.setDate(cod.getDate() + 1);
-            co = cod.getFullYear() + '-' + pad(cod.getMonth() + 1) + '-' + pad(cod.getDate());
-          }
-        }
         var u = ac.bookingUrl + (ci && co ? ('?checkin=' + ci + '&checkout=' + co + '&group_adults=2&no_rooms=1') : '');
         bookHtml = '<a href="' + u + '" target="_blank" rel="noopener">🛏 Varaa Booking.comista' +
           (ci && co ? ' (' + fmtDateFi(isoToDate(ci)) + '–' + fmtDateFi(isoToDate(co)) + ')' : '') + ' ›</a> · ';
       }
       card.innerHTML =
-        '<h3><span class="night">Yö ' + ac.night + '</span> ' + ac.name + '</h3>' +
+        '<h3><span class="night">' + nightLabel + '</span> ' + ac.name + '</h3>' +
         '<p>' + (ac.address || '') + (ac.note ? '<br>' + ac.note : '') + '</p>' +
         bookHtml +
         (ac.link ? '<a href="' + ac.link + '" target="_blank" rel="noopener">Verkkosivu ›</a> · ' : '') +

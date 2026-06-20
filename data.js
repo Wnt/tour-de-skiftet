@@ -166,13 +166,13 @@ window.TRIP = {
       night: 1, name: 'Restaurang Sybarit & Bed and Breakfast', address: 'Näsbyvägen 189, 21760 Houtskär',
       lat: 60.2228, lon: 21.3685, link: 'https://www.bedandbreakfast.eu/en/a/XvTueNhFQ4O8/bed-breakfast-restaurang-sybarit',
       bookingUrl: 'https://www.booking.com/hotel/fi/bed-amp-breakfast-restaurang-sybarit.html',
-      note: 'Yö 1 · Houtskär (Näsby), ~200 m vierasvenesatamasta. Ravintola samassa.'
+      note: 'Houtskär (Näsby), ~200 m vierasvenesatamasta. Ravintola samassa. Yöpyminen päivän 1 jälkeen.'
     },
     {
       night: 2, name: 'Peterzens Boathouse', address: 'Parattulan rantatie 16, 23360 Kustavi',
       lat: 60.4950, lon: 21.4400, link: 'https://peterzens.com',
       bookingUrl: 'https://www.booking.com/hotel/fi/peterzens-boathouse.html',
-      note: 'Yö 2 · Kustavi, reissun tukikohta — jätä auto tänne ja aja kotiin lopuksi. Laupusten niemellä, ~500 m Heponiemen lauttarannasta. (Huom: ei Brändöllä/Lapolla.)'
+      note: 'Kustavi, reissun tukikohta — jätä auto tänne. Myötäpäivään: yö 2 (matkan päätteeksi). Vastapäivään: yövy täällä jo edellisiltana ennen lähtöä. Laupusten niemellä, lähellä Heponiemen lauttarantaa. (Huom: ei Brändöllä/Lapolla.)'
     }
   ],
 
