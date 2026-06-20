@@ -248,6 +248,24 @@ h1, h2, h3, p { margin: 0; }
   .day-plan, .ferry-list, .weather-list, .lodging-list { max-width: 720px; }
 }
 
+/* Base (Kustavi start/finish) selector */
+.base-select {
+  margin: 10px 0 4px; padding: 10px 12px; background: var(--card);
+  border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow);
+}
+.base-select__lbl { display: block; font-size: .78rem; font-weight: 800; color: var(--teal-dark); margin-bottom: 8px; }
+.base-select__btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.base-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  border: 1.5px solid var(--line); background: #fff; border-radius: 10px;
+  padding: 9px 8px; min-height: 48px; font-size: .9rem; font-weight: 800; color: var(--ink);
+  cursor: pointer; transition: border-color .15s, background .15s;
+}
+.base-btn small { font-size: .68rem; font-weight: 600; color: var(--muted); }
+.base-btn--active { border-color: var(--teal); background: #d3f4f7; box-shadow: 0 0 0 1.5px var(--teal); }
+.base-btn--active small { color: var(--teal-dark); }
+.base-btn:active { transform: scale(.98); }
+
 /* Options view */
 .options-list { display: flex; flex-direction: column; gap: 14px; margin-top: 10px; }
 

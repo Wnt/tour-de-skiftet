@@ -96,55 +96,89 @@
     return { label: dirs[i], arrow: arrows[i] };
   }
 
-  /* ---------- Canonical legs (clockwise order from data.js) ---------- */
+  /* ---------- Canonical legs + selectable Kustavi base ---------- */
   var CANON_LEGS = (T.legs || []).map(function (l) { return Object.assign({}, l); });
+  function clone(l) { return Object.assign({}, l); }
 
-  /* Notes that depend on the ACTUAL travel direction (canonical data is CW).
-     Keyed "from>to" — applied after legs are built so both directions read true. */
-  var DIR_NOTES = {
-    'peterzens>heponiemi': 'Lauttarantaan',
-    'heponiemi>peterzens': 'Takaisin lähtöpisteeseen — matka päättyy',
-    'peterzens>kivimaa':   'Kohti Osnäsin lauttaa — retki alkaa',
-    'kivimaa>peterzens':   'Takaisin lähtöpisteeseen',
-    'nasby>roslax':        'Suora maantie Roslaxin lauttarantaan — ei kaapelilossia',
-    'roslax>nasby':        'Suora maantie Näsbyn kylään (Sybarit) — ei kaapelilossia',
-    'ava>osnas':           'Ådan — maksuton tähän suuntaan (varaus silti pakollinen)',
-    'osnas>ava':           'Ådan — maksullinen: pyörä 4,80 € (verkko) / 6 €. Varaus pakollinen.',
-    'roslax>torsholma':    'Houtskärin reitti ~2 h (m/s Rosala 2) — varaa edellisenä iltana klo 17 mennessä',
-    'torsholma>roslax':    'Houtskärin reitti ~2 h (m/s Rosala 2) — varaa jo ennen matkaa, edellisiltana klo 17 (su: la klo 14)'
+  // Core (island) legs are base-independent: from the first Iniö ferry (heponiemi→…)
+  // through the Åva→Osnäs ferry. Kustavi connector legs come from the chosen base.
+  var _hi = CANON_LEGS.findIndex(function (l) { return l.from === 'heponiemi'; });
+  var _oi = CANON_LEGS.findIndex(function (l) { return l.to === 'osnas'; });
+  var CORE_LEGS = (_hi >= 0 && _oi >= _hi) ? CANON_LEGS.slice(_hi, _oi + 1) : CANON_LEGS.slice();
+
+  var BASE_KEY = 'skiftet_base_v1';
+  function defaultBase() { return (T.bases && T.bases.peterzens) ? 'peterzens' : Object.keys(T.bases || { peterzens: 1 })[0]; }
+  function loadBase() {
+    try { var b = localStorage.getItem(BASE_KEY); if (b && T.bases && T.bases[b]) return b; } catch (e) {}
+    return defaultBase();
+  }
+  var BASE = loadBase();
+  var FIXED_ACC = (T.accommodations || []).slice(); // Houtskär night (base-independent)
+  function baseObj() { return (T.bases && T.bases[BASE]) || (T.bases && T.bases.peterzens) || {}; }
+
+  // Active accommodations = Sybarit + the chosen base's lodging (for map + Info).
+  function syncBaseAccommodations() {
+    var b = baseObj();
+    T.accommodations = FIXED_ACC.concat(b.accommodation ? [b.accommodation] : []);
+  }
+  syncBaseAccommodations();
+
+  // Canonical CW legs for the active base = base connector + island core + base connector.
+  function canonForBase() {
+    var b = baseObj();
+    return (b.toHeponiemi || []).map(clone).concat(CORE_LEGS.map(clone)).concat((b.osnasToBase || []).map(clone));
+  }
+
+  function shiftKey(key, n) { var d = isoToDate(key); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+
+  /* Fixed (non-base) notes that flip with travel direction. */
+  var FIXED_DIR_NOTES = {
+    'nasby>roslax':     'Suora maantie Roslaxin lauttarantaan — ei kaapelilossia',
+    'roslax>nasby':     'Suora maantie Näsbyn kylään (Sybarit) — ei kaapelilossia',
+    'ava>osnas':        'Ådan — maksuton tähän suuntaan (varaus silti pakollinen)',
+    'osnas>ava':        'Ådan — maksullinen: pyörä 4,80 € (verkko) / 6 €. Varaus pakollinen.',
+    'roslax>torsholma': 'Houtskärin reitti ~2 h (m/s Rosala 2) — varaa edellisenä iltana klo 17 mennessä',
+    'torsholma>roslax': 'Houtskärin reitti ~2 h (m/s Rosala 2) — varaa jo ennen matkaa, edellisiltana klo 17 (su: la klo 14)'
   };
+  // Direction- & base-aware note for a leg; undefined keeps the canonical note.
+  function directionalNote(from, to, base) {
+    if (from === base && to === 'heponiemi') return 'Lauttarantaan — retki alkaa';
+    if (from === 'heponiemi' && to === base) return 'Takaisin lähtöpisteeseen — matka päättyy';
+    if (from === base && (to === 'kivimaa' || to === 'osnas'))
+      return to === 'osnas' ? 'Kohti Osnäsin lauttaa — retki alkaa (Vartsalan lossi matkalla)' : 'Kohti Osnäsin lauttaa — retki alkaa';
+    if ((from === 'kivimaa' || from === 'osnas') && to === base)
+      return from === 'osnas' ? 'Takaisin lähtöpisteeseen — matka päättyy (Vartsalan lossi matkalla)' : 'Takaisin lähtöpisteeseen — matka päättyy';
+    if ((from === 'osnas' && to === 'kivimaa') || (from === 'kivimaa' && to === 'osnas')) return 'Matkalla Vartsalan kaapelilossi';
+    return FIXED_DIR_NOTES[from + '>' + to];
+  }
 
-  /* Direction-aware lodging plan for a day. In CW you drive in on day 1 and the
-     2nd Kustavi night is after day 2. In CCW the binding Houtskär ferry is on day 1
-     and must be pre-booked, so you must overnight at Peterzens BEFORE departure;
-     day 2 then just returns to Kustavi and you drive home (no 2nd night). */
+  /* Direction-aware lodging plan for a day (Kustavi nights use the active base). */
   function lodgingFor(dir, dayNum) {
     if (dir === 'cw') {
       if (dayNum === 1) return {
         preNight: null,
-        morningNote: 'Aja autolla Kustaviin (Peterzens), pura pyörät — retki alkaa täältä.',
+        morningNote: 'Aja autolla Kustaviin (tukikohta), pura pyörät — retki alkaa täältä.',
         overnight: { key: 'sybarit' },
         endNote: null
       };
-      return { preNight: null, morningNote: null, overnight: { key: 'peterzens' }, endNote: null };
+      return { preNight: null, morningNote: null, overnight: { key: 'base' }, endNote: null };
     }
-    // ccw
+    // ccw — Kustavi base is the night BEFORE departure; day 2 returns home, no 2nd night
     if (dayNum === 1) return {
-      preNight: { key: 'peterzens', note: 'Aja Kustaviin jo edellisenä iltana ja yövy täällä. Varaa Houtskärin reitin lautta (Torsholma→Roslax) klo 17 mennessä — su-lähtö viimeistään la klo 14. Aamulla ehdit ajoissa lautoille.' },
-      morningNote: 'Pura pyörät ja lähde aamulla Peterzensiltä kohti Osnäsin lauttaa.',
+      preNight: { key: 'base', note: 'Aja Kustaviin jo edellisenä iltana ja yövy täällä. Varaa Houtskärin reitin lautta (Torsholma→Roslax) klo 17 mennessä — su-lähtö viimeistään la klo 14. Aamulla ehdit ajoissa lautoille.' },
+      morningNote: 'Pura pyörät ja lähde aamulla tukikohdasta kohti Osnäsin lauttaa.',
       overnight: { key: 'sybarit' },
       endNote: null
     };
-    return { preNight: null, morningNote: null, overnight: null, endNote: 'Takaisin Kustaviin (Peterzens) — matka päättyy. Auto odottaa täällä; aja kotiin.' };
+    return { preNight: null, morningNote: null, overnight: null, endNote: 'Takaisin Kustaviin (tukikohta) — matka päättyy. Auto odottaa täällä; aja kotiin.' };
   }
 
   function accByKey(key) {
-    var sub = key === 'sybarit' ? 'sybarit' : 'peterzens';
-    return (T.accommodations || []).filter(function (a) { return (a.name || '').toLowerCase().indexOf(sub) >= 0; })[0];
+    if (key === 'sybarit') return (T.accommodations || []).filter(function (a) { return /sybarit/i.test(a.name || ''); })[0];
+    return (T.accommodations || []).filter(function (a) { return !/sybarit/i.test(a.name || ''); })[0]; // 'base'
   }
-  function shiftKey(key, n) { var d = isoToDate(key); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
 
-  /* Render a lodging box: "<prefix>: <name>" + optional note + date-prefilled Booking.com link */
+  /* Render a lodging box: "<prefix>: <name>" + optional note + booking/website link */
   function lodgingBox(prefix, accKey, ci, co, extraNote) {
     var acc = accByKey(accKey);
     var name = acc ? acc.name : accKey;
@@ -157,44 +191,59 @@
         '🛏 Varaa Booking.comista (' + fmtDateFi(isoToDate(ci)) + '–' + fmtDateFi(isoToDate(co)) + ') →');
       bLink.href = bUrl; bLink.target = '_blank'; bLink.rel = 'noopener';
       box.appendChild(bLink);
+    } else if (acc && acc.link) {
+      var wLink = el('a', 'day-card__book-link', '🛏 Varaa / lisätiedot →');
+      wLink.href = acc.link; wLink.target = '_blank'; wLink.rel = 'noopener';
+      box.appendChild(wLink);
     }
     return box;
   }
 
-  /* ---------- Generate legs for a given direction ---------- */
+  /* ---------- Generate legs for a given direction (and the active base) ---------- */
   function generateLegs(dir) {
+    var canon = canonForBase();
     var legs;
     if (dir === 'cw') {
-      legs = CANON_LEGS.map(function (l) { return Object.assign({}, l); });
+      legs = canon.map(clone);
     } else {
-      // CCW: reverse and swap from/to
-      legs = CANON_LEGS.slice().reverse().map(function (l) {
-        return Object.assign({}, l, { from: l.to, to: l.from });
-      });
+      legs = canon.slice().reverse().map(function (l) { return Object.assign({}, l, { from: l.to, to: l.from }); });
     }
-    // Assign day tags: day=1 up to and including the leg whose to==='nasby', day=2 after
+    // Day split at Näsby (Houtskär overnight)
     var passedNasby = false;
-    // In CW the overnight is at nasby (to===nasby). In CCW reversed legs, from===nasby is the start of day 2.
-    // Strategy: for cw, leg.to==='nasby' is end of day 1.
-    //           for ccw, reversed list: the overnight split is the same place; find the leg where original.to==='nasby'
-    //           which after reversal becomes leg.from==='nasby'.
     legs.forEach(function (leg) {
       if (!passedNasby) {
         leg.day = 1;
-        // CW: we're done with day1 after delivering TO nasby
         if (dir === 'cw' && leg.to === 'nasby') passedNasby = true;
-        // CCW: reversed — the leg that departs FROM nasby is the first leg of day 2
         if (dir === 'ccw' && leg.from === 'nasby') { leg.day = 2; passedNasby = true; }
       } else {
         leg.day = 2;
       }
     });
-    // Direction-correct notes for legs whose meaning flips with travel direction
+    // Direction- & base-correct notes
+    var base = baseObj().placeKey || 'peterzens';
     legs.forEach(function (leg) {
-      var k = leg.from + '>' + leg.to;
-      if (DIR_NOTES.hasOwnProperty(k)) leg.note = DIR_NOTES[k];
+      var n = directionalNote(leg.from, leg.to, base);
+      if (n !== undefined) leg.note = n;
     });
     return legs;
+  }
+
+  /* ---------- setBase: switch Kustavi base, persist, re-render ---------- */
+  function setBase(key) {
+    if (!T.bases || !T.bases[key] || key === BASE) { updateBaseUI(); return; }
+    BASE = key;
+    try { localStorage.setItem(BASE_KEY, key); } catch (e) {}
+    syncBaseAccommodations();
+    if (SELECTED) {
+      applyOption({ direction: SELECTED.direction, d1key: SELECTED.d1key, d2key: SELECTED.d2key }, true, autoDefault);
+    }
+    updateBaseUI();
+  }
+  function updateBaseUI() {
+    document.querySelectorAll('.base-btn').forEach(function (b) {
+      b.classList.toggle('base-btn--active', b.getAttribute('data-base') === BASE);
+      b.setAttribute('aria-pressed', b.getAttribute('data-base') === BASE ? 'true' : 'false');
+    });
   }
 
   /* ---------- displayName: strip " (...)" parenthetical suffixes ---------- */
@@ -1026,6 +1075,12 @@
     t.addEventListener('click', function () { showView(t.getAttribute('data-view')); });
   });
 
+  /* Base (Kustavi start/finish) selector */
+  document.querySelectorAll('.base-btn').forEach(function (b) {
+    b.addEventListener('click', function () { setBase(b.getAttribute('data-base')); });
+  });
+  updateBaseUI();
+
   /* hashchange: back/forward browser navigation and external deep links */
   window.addEventListener('hashchange', function () {
     if (_programmaticHash) { _programmaticHash = false; return; }
@@ -1125,7 +1180,7 @@
       if (lat == null && ac.place && hasCoord(place(ac.place))) { lat = place(ac.place).lat; lon = place(ac.place).lon; }
       if (lat == null) return;
       var m = L.marker([lat, lon], { icon: pinIcon('pin--lodging', '🛏'), title: ac.name, zIndexOffset: 1000 }).addTo(routeLayer);
-      m.bindPopup('<b>🛏 Yö ' + ac.night + ': ' + ac.name + '</b><br><span class="popup-sub">' + (ac.address || '') + '</span>' +
+      m.bindPopup('<b>🛏 ' + ac.name + '</b><br><span class="popup-sub">' + (ac.address || '') + '</span>' +
         (ac.link ? '<br><a href="' + ac.link + '" target="_blank" rel="noopener">Lisätietoja ›</a>' : ''));
       bounds.push([lat, lon]);
     });

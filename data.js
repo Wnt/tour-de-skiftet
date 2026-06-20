@@ -15,6 +15,7 @@ window.TRIP = {
   /* ---- Places (keys referenced by legs) ---- */
   places: {
     peterzens:   { name: 'Peterzens Boathouse', island: 'Kustavi (Laupunen)', type: 'accommodation', lat: 60.4950, lon: 21.4400 },
+    lootholma:   { name: 'Kustavin Lootholma', island: 'Kustavi (Kivimaa)', type: 'accommodation', lat: 60.5293, lon: 21.3701 },
     heponiemi:   { name: 'Heponiemi (lauttaranta)', island: 'Kustavi', type: 'ferryTerminal', lat: 60.4851, lon: 21.4351 },
     kivimaa:     { name: 'Kivimaa (Kustavin keskusta)', island: 'Kustavi', type: 'town', lat: 60.5449, lon: 21.3556 },
     vartsala:    { name: 'Vartsala', island: 'Kustavi', type: 'village', lat: 60.5360, lon: 21.3008 },
@@ -160,21 +161,47 @@ window.TRIP = {
     }
   },
 
-  /* ---- Accommodations ---- */
+  /* ---- Accommodations: the Houtskär night (base-independent). The Kustavi base
+     night comes from the selected `bases` entry and is merged in at runtime. ---- */
   accommodations: [
     {
       night: 1, name: 'Restaurang Sybarit & Bed and Breakfast', address: 'Näsbyvägen 189, 21760 Houtskär',
       lat: 60.2228, lon: 21.3685, link: 'https://www.bedandbreakfast.eu/en/a/XvTueNhFQ4O8/bed-breakfast-restaurang-sybarit',
       bookingUrl: 'https://www.booking.com/hotel/fi/bed-amp-breakfast-restaurang-sybarit.html',
       note: 'Houtskär (Näsby), ~200 m vierasvenesatamasta. Ravintola samassa. Yöpyminen päivän 1 jälkeen.'
-    },
-    {
-      night: 2, name: 'Peterzens Boathouse', address: 'Parattulan rantatie 16, 23360 Kustavi',
-      lat: 60.4950, lon: 21.4400, link: 'https://peterzens.com',
-      bookingUrl: 'https://www.booking.com/hotel/fi/peterzens-boathouse.html',
-      note: 'Kustavi, reissun tukikohta — jätä auto tänne. Myötäpäivään: yö 2 (matkan päätteeksi). Vastapäivään: yövy täällä jo edellisiltana ennen lähtöä. Laupusten niemellä, lähellä Heponiemen lauttarantaa. (Huom: ei Brändöllä/Lapolla.)'
     }
   ],
+
+  /* ---- Selectable Kustavi base (start/finish). Each base supplies its own
+     Kustavi connector legs (CW order) and its lodging. Peterzens sits by the
+     Heponiemi (Iniö) ferry → one day is short, the other long. Lootholma is
+     central (Kivimaa) → days split far more evenly (~37/39 km). ---- */
+  bases: {
+    peterzens: {
+      key: 'peterzens', label: 'Peterzens', placeKey: 'peterzens',
+      dayKm: '26 + 47 km', balance: 'epätasainen',
+      toHeponiemi: [ { from: 'peterzens', to: 'heponiemi', mode: 'bike', km: 1.3 } ],
+      osnasToBase: [ { from: 'osnas', to: 'kivimaa', mode: 'bike', km: 9.5 },
+                     { from: 'kivimaa', to: 'peterzens', mode: 'bike', km: 11.4 } ],
+      accommodation: {
+        name: 'Peterzens Boathouse', address: 'Parattulan rantatie 16, 23360 Kustavi',
+        lat: 60.4950, lon: 21.4400, link: 'https://peterzens.com',
+        bookingUrl: 'https://www.booking.com/hotel/fi/peterzens-boathouse.html',
+        note: 'Kustavi (Laupunen), reissun tukikohta — jätä auto tänne. Aivan Heponiemen lauttarannan vieressä, joten Iniö-päivä jää lyhyeksi ja Brändö-päivä pitkäksi. (Huom: ei Brändöllä/Lapolla.)'
+      }
+    },
+    lootholma: {
+      key: 'lootholma', label: 'Lootholma', placeKey: 'lootholma',
+      dayKm: '39 + 37 km', balance: 'tasainen',
+      toHeponiemi: [ { from: 'lootholma', to: 'heponiemi', mode: 'bike', km: 13.8 } ],
+      osnasToBase: [ { from: 'osnas', to: 'lootholma', mode: 'bike', km: 10.5 } ],
+      accommodation: {
+        name: 'Kustavin Lootholma', address: 'Kuninkaantie 193, 23360 Kustavi',
+        lat: 60.5293, lon: 21.3701, link: 'https://lootholma.fi', bookingUrl: null,
+        note: 'Kustavi (Kivimaa) — leirintä, mökit ja ravintola. Keskeinen sijainti tasaa päivien ajomatkat (~39 + 37 km lähtöpäivien sijaan 26 + 47 km). Lähellä keskustaa ja palveluita.'
+      }
+    }
+  },
 
   /* ---- Day-by-day plan ----
      Generated at runtime from the selected option (Vaihtoehdot → Valitse),
