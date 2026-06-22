@@ -25,6 +25,7 @@ window.TRIP = {
     jurmo:       { name: 'Jurmo', island: 'Brändö', type: 'side', lat: 60.5169, lon: 21.0766 },
     brando_kby:  { name: 'Brändön kirkonkylä', island: 'Brändö', type: 'village', lat: 60.4176, lon: 21.0334 },
     torsholma:   { name: 'Torsholma (lauttaranta)', island: 'Brändö', type: 'ferryTerminal', lat: 60.3566, lon: 21.0382 },
+    hummelholm:  { name: 'Hummelholm (Torsholman korvaava laituri)', island: 'Brändö', type: 'ferryTerminal', lat: 60.3582, lon: 21.0377 },
     lappo:       { name: 'Lappo', island: 'Brändö', type: 'side', lat: 60.3170, lon: 20.9920 },
     asterholma:  { name: 'Asterholma', island: 'Brändö', type: 'side', lat: 60.3042, lon: 21.0375 },
     roslax:      { name: 'Roslax (lauttaranta)', island: 'Houtskär', type: 'ferryTerminal', lat: 60.2337, lon: 21.3348 },
@@ -49,8 +50,8 @@ window.TRIP = {
     { day: 1, from: 'mossala',   to: 'nasby',     mode: 'bike',  km: 16.4, island: 'Houtskär', note: '' },
     // DAY 2 — Ti 23.6  Houtskär → Brändö → Kustavi  (paras pyöräsää)
     { day: 2, from: 'nasby',     to: 'roslax',    mode: 'bike',  km: 5,    island: 'Houtskär', note: 'Suora maantie Roslaxin lauttarantaan — ei kaapelilossia' },
-    { day: 2, from: 'roslax',    to: 'torsholma', mode: 'ferry', km: 55,   ferry: 'skiftet', note: 'Houtskärin reitti ~2 h (m/s Rosala 2) — varaa edellisenä päivänä klo 17' },
-    { day: 2, from: 'torsholma', to: 'brando_kby',mode: 'bike',  km: 8.6,  island: 'Brändö', note: '' },
+    { day: 2, from: 'roslax',    to: 'hummelholm', mode: 'ferry', km: 55,   ferry: 'skiftet', note: 'Houtskärin reitti ~2 h (m/s Rosala 2) — varaa edellisenä päivänä klo 17. HUOM: laituriremontin takia alus lähtee/saapuu Torsholman Hummelholmin laiturille (tuulimyllyn vierestä), ei tavalliselle Torsholman lauttarannalle.' },
+    { day: 2, from: 'hummelholm', to: 'brando_kby',mode: 'bike',  km: 8.5,  island: 'Brändö', note: '' },
     { day: 2, from: 'brando_kby',to: 'ava',       mode: 'bike',  km: 12.5, island: 'Brändö', note: 'Lounastauko' },
     { day: 2, from: 'ava',       to: 'osnas',     mode: 'ferry', km: 25,   ferry: 'adan',   note: 'Ådan — maksuton tähän suuntaan' },
     { day: 2, from: 'osnas',     to: 'kivimaa',   mode: 'bike',  km: 9.5,  island: 'Kustavi', note: '' },
@@ -88,25 +89,25 @@ window.TRIP = {
       ]
     },
     skiftet: {
-      name: 'Torsholma ↔ Roslax · Houtskärin reitti',
+      name: 'Hummelholm (Torsholma) ↔ Roslax · Houtskärin reitti',
       operator: 'Finferries · m/s Rosala 2',
       crossingMin: 135,
       booking: 'yes',
       bookingUrl: 'https://booking.finferries.fi',
       bookingProvider: 'Finferries',
       price: 'Maksuton matkustajalle ja pyörälle.',
-      note: 'VARAUS PAKOLLINEN viimeistään edellisenä päivänä klo 17 (su-vuorot la klo 14 mennessä) — booking.finferries.fi. Liikennöi VAIN ke, to, pe ja su — ei ma, ti eikä la. Pitkä ulkosaaristoylitys ~2–2,5 h, useita pysähdyksiä. Juhannus: pe 19.6. ja la 20.6. ei liikennettä.',
+      note: 'LAITURIMUUTOS: laituriremontin takia alus lähtee/saapuu Torsholman Hummelholmin laiturilta (tuulimyllyn vierestä) — ei tavalliselta Torsholman lauttarannalta. VARAUS PAKOLLINEN viimeistään edellisenä päivänä klo 17 (su-vuorot la klo 14 mennessä) — booking.finferries.fi. Liikennöi VAIN ke, to, pe ja su — ei ma, ti eikä la. Pitkä ulkosaaristoylitys ~2–2,5 h, useita pysähdyksiä. Juhannus: pe 19.6. ja la 20.6. ei liikennettä.',
       links: [
         { label: 'Varaa (Finferries booking)', url: 'https://booking.finferries.fi' },
         { label: 'Houtskärin reitin aikataulu (PDF)', url: 'https://www.finferries.fi/media/aikataulut-2026/houtskarin-reitti-kesa-6.6.-18.8.2026.pdf' }
       ],
       schedules: [
-        { direction: 'Roslax → Torsholma', from: 'roslax', to: 'torsholma', days: 'Ke, To', dow: [3, 4], season: 'Kesä', times: ['12:35'] },
-        { direction: 'Roslax → Torsholma', from: 'roslax', to: 'torsholma', days: 'Pe', dow: [5], season: 'Kesä', times: ['12:35', '18:10'] },
-        { direction: 'Roslax → Torsholma', from: 'roslax', to: 'torsholma', days: 'Su', dow: [0], season: 'Kesä', times: ['11:00', '17:40'] },
-        { direction: 'Torsholma → Roslax', from: 'torsholma', to: 'roslax', days: 'Ke, To', dow: [3, 4], season: 'Kesä', times: ['15:15'] },
-        { direction: 'Torsholma → Roslax', from: 'torsholma', to: 'roslax', days: 'Pe', dow: [5], season: 'Kesä', times: ['15:15', '21:10'] },
-        { direction: 'Torsholma → Roslax', from: 'torsholma', to: 'roslax', days: 'Su', dow: [0], season: 'Kesä', times: ['14:20', '20:20'] }
+        { direction: 'Roslax → Torsholma (Hummelholm)', from: 'roslax', to: 'hummelholm', days: 'Ke, To', dow: [3, 4], season: 'Kesä', times: ['12:35'] },
+        { direction: 'Roslax → Torsholma (Hummelholm)', from: 'roslax', to: 'hummelholm', days: 'Pe', dow: [5], season: 'Kesä', times: ['12:35', '18:10'] },
+        { direction: 'Roslax → Torsholma (Hummelholm)', from: 'roslax', to: 'hummelholm', days: 'Su', dow: [0], season: 'Kesä', times: ['11:00', '17:40'] },
+        { direction: 'Torsholma (Hummelholm) → Roslax', from: 'hummelholm', to: 'roslax', days: 'Ke, To', dow: [3, 4], season: 'Kesä', times: ['15:15'] },
+        { direction: 'Torsholma (Hummelholm) → Roslax', from: 'hummelholm', to: 'roslax', days: 'Pe', dow: [5], season: 'Kesä', times: ['15:15', '21:10'] },
+        { direction: 'Torsholma (Hummelholm) → Roslax', from: 'hummelholm', to: 'roslax', days: 'Su', dow: [0], season: 'Kesä', times: ['14:20', '20:20'] }
       ]
     },
     replot: {

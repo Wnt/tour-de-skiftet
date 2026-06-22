@@ -137,8 +137,8 @@
     'roslax>nasby':     'Suora maantie Näsbyn kylään (Sybarit) — ei kaapelilossia',
     'ava>osnas':        'Ådan — maksuton tähän suuntaan (varaus silti pakollinen)',
     'osnas>ava':        'Ådan — maksullinen: pyörä 4,80 € (verkko) / 6 €. Varaus pakollinen.',
-    'roslax>torsholma': 'Houtskärin reitti ~2 h (m/s Rosala 2) — varaa edellisenä iltana klo 17 mennessä',
-    'torsholma>roslax': 'Houtskärin reitti ~2 h (m/s Rosala 2) — varaa jo ennen matkaa, edellisiltana klo 17 (su: la klo 14)'
+    'roslax>hummelholm': 'Houtskärin reitti ~2 h (m/s Rosala 2) — laituriremontin takia Torsholman Hummelholmin laiturille (tuulimyllyn vierestä). Varaa edellisenä iltana klo 17 mennessä',
+    'hummelholm>roslax': 'Houtskärin reitti ~2 h (m/s Rosala 2) — lähtö Torsholman Hummelholmin laiturilta (tuulimyllyn vierestä, laituriremontti). Varaa jo ennen matkaa, edellisiltana klo 17 (su: la klo 14)'
   };
   // Direction- & base-aware note for a leg; undefined keeps the canonical note.
   // The base appears only at the trip's very first leg (departure) and very last (arrival).
